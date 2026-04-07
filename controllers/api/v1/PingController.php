@@ -9,11 +9,11 @@ class PingController extends ApiController
     /**
      * @OA\Get(
      *     path="/api/v1/ping",
-     *     tags={"System"},
-     *     summary="API health check",
+     *     tags={"Система"},
+     *     summary="Проверка доступности API",
      *     @OA\Response(
      *         response=200,
-     *         description="Service is available",
+     *         description="Сервис доступен",
      *         @OA\JsonContent(ref="#/components/schemas/PingResponse")
      *     )
      * )

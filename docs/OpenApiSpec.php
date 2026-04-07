@@ -8,14 +8,14 @@ use OpenApi\Annotations as OA;
  * @OA\OpenApi(
  *     @OA\Server(
  *         url="/",
- *         description="Current API host"
+ *         description="Текущий хост API"
  *     )
  * )
  *
  * @OA\Info(
  *     title="Fabrika API",
  *     version="1.0.0",
- *     description="Auto-generated API documentation"
+ *     description="Автоматически сгенерированная документация API"
  * )
  *
  * @OA\SecurityScheme(

@@ -26,11 +26,11 @@ class DefaultController extends Controller
     /**
      * @OA\Get(
      *     path="/admin/default/index",
-     *     tags={"Admin"},
-     *     summary="Admin module landing page",
+     *     tags={"Админка"},
+     *     summary="Стартовая страница модуля администрирования",
      *     @OA\Response(
      *         response=200,
-     *         description="HTML admin page"
+     *         description="HTML-страница админки"
      *     )
      * )
      */

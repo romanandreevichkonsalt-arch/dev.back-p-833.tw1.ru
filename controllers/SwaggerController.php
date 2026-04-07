@@ -21,11 +21,11 @@ class SwaggerController extends Controller
     /**
      * @OA\Get(
      *     path="/swagger/json-schema",
-     *     tags={"Documentation"},
-     *     summary="Returns generated OpenAPI schema as JSON",
+     *     tags={"Документация"},
+     *     summary="Возвращает сгенерированную OpenAPI-схему в формате JSON",
      *     @OA\Response(
      *         response=200,
-     *         description="OpenAPI schema",
+     *         description="OpenAPI-схема",
      *         @OA\JsonContent(type="object")
      *     )
      * )
@@ -37,7 +37,7 @@ class SwaggerController extends Controller
         $openapi = (new Generator())->generate(
             [
                 Yii::getAlias('@app/docs'),
-                Yii::getAlias('@app/controllers/api/v1'),
+                Yii::getAlias('@app/controllers'),
                 Yii::getAlias('@app/models'),
             ],
             null,

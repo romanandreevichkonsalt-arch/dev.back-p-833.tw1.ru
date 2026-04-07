@@ -19,17 +19,17 @@ class ProfileController extends ApiController
     /**
      * @OA\Get(
      *     path="/api/v1/profile/me",
-     *     tags={"Profile"},
-     *     summary="Returns current user profile",
+     *     tags={"Профиль"},
+     *     summary="Возвращает профиль текущего пользователя",
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
-     *         description="Current user profile",
+     *         description="Профиль текущего пользователя",
      *         @OA\JsonContent(ref="#/components/schemas/ProfileMeResponse")
      *     ),
      *     @OA\Response(
      *         response=401,
-     *         description="Unauthorized"
+     *         description="Не авторизован"
      *     )
      * )
      */
