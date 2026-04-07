@@ -2,10 +2,11 @@
 
 namespace app\models;
 
-class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
+use yii\db\ActiveRecord;
+use yii\web\IdentityInterface;
+
+class User extends ActiveRecord implements IdentityInterface
 {
-    public $id;
-    public $username;
     public $password;
     public $authKey;
     public $accessToken;
@@ -27,12 +28,43 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
         ],
     ];
 
+    public static function tableName(): string
+    {
+        return '{{%users}}';
+    }
+
+    public function rules(): array
+    {
+        return [
+            [['phone'], 'required'],
+            [['phone'], 'string', 'max' => 11],
+            [['phone'], 'match', 'pattern' => '/^7\d{10}$/'],
+            [['phone'], 'unique'],
+            [['username'], 'string', 'max' => 255],
+            [['created_at', 'updated_at'], 'safe'],
+        ];
+    }
+
+    public function behaviors(): array
+    {
+        return [
+            'timestamp' => [
+                'class' => \yii\behaviors\TimestampBehavior::class,
+                'value' => static fn (): string => date('Y-m-d H:i:s'),
+            ],
+        ];
+    }
 
     /**
      * {@inheritdoc}
      */
     public static function findIdentity($id)
     {
+        $user = static::findOne($id);
+        if ($user !== null) {
+            return $user;
+        }
+
         return isset(self::$users[$id]) ? new static(self::$users[$id]) : null;
     }
 
@@ -41,9 +73,19 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
-        foreach (self::$users as $user) {
-            if ($user['accessToken'] === $token) {
-                return new static($user);
+        $tokenHash = hash('sha256', $token);
+        $apiToken = ApiAccessToken::find()
+            ->where(['token_hash' => $tokenHash, 'revoked_at' => null])
+            ->andWhere(['>', 'expires_at', date('Y-m-d H:i:s')])
+            ->one();
+
+        if ($apiToken !== null) {
+            return static::findIdentity($apiToken->user_id);
+        }
+
+        foreach (self::$users as $legacyUser) {
+            if ($legacyUser['accessToken'] === $token) {
+                return new static($legacyUser);
             }
         }
 
@@ -58,6 +100,11 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public static function findByUsername($username)
     {
+        $user = static::find()->where(['username' => $username])->one();
+        if ($user !== null) {
+            return $user;
+        }
+
         foreach (self::$users as $user) {
             if (strcasecmp($user['username'], $username) === 0) {
                 return new static($user);
@@ -65,6 +112,11 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
         }
 
         return null;
+    }
+
+    public static function findByPhone(string $phone): ?self
+    {
+        return static::find()->where(['phone' => $phone])->one();
     }
 
     /**
@@ -80,7 +132,7 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public function getAuthKey()
     {
-        return $this->authKey;
+        return $this->authKey ?? ('user-' . $this->getId());
     }
 
     /**
@@ -88,7 +140,7 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public function validateAuthKey($authKey)
     {
-        return $this->authKey === $authKey;
+        return $this->getAuthKey() === $authKey;
     }
 
     /**
@@ -99,6 +151,11 @@ class User extends \yii\base\BaseObject implements \yii\web\IdentityInterface
      */
     public function validatePassword($password)
     {
-        return $this->password === $password;
+        if ($this->password !== null) {
+            return $this->password === $password;
+        }
+
+        // For phone-auth users password login is disabled by design.
+        return false;
     }
 }

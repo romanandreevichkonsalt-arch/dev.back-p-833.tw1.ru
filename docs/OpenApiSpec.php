@@ -26,6 +26,14 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\PathItem(
+ *     path="/api/v1/auth/request-code"
+ * )
+ *
+ * @OA\PathItem(
+ *     path="/api/v1/auth/verify-code"
+ * )
+ *
+ * @OA\PathItem(
  *     path="/swagger/json-schema"
  * )
  *
@@ -39,6 +47,46 @@ use OpenApi\Annotations as OA;
  *
  * @OA\PathItem(
  *     path="/admin/default/index"
+ * )
+ *
+ * @OA\Schema(
+ *     schema="AuthRequestCodeInput",
+ *     type="object",
+ *     required={"phone"},
+ *     @OA\Property(property="phone", type="string", example="79998886644")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="AuthRequestCodeOutput",
+ *     type="object",
+ *     required={"phone","code","expires_in"},
+ *     @OA\Property(property="phone", type="string", example="79998886644"),
+ *     @OA\Property(property="code", type="string", example="123456"),
+ *     @OA\Property(property="expires_in", type="integer", example=300)
+ * )
+ *
+ * @OA\Schema(
+ *     schema="AuthVerifyCodeInput",
+ *     type="object",
+ *     required={"phone","code"},
+ *     @OA\Property(property="phone", type="string", example="79998886644"),
+ *     @OA\Property(property="code", type="string", example="123456")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="AuthVerifyCodeOutput",
+ *     type="object",
+ *     required={"token_type","access_token","expires_in","user"},
+ *     @OA\Property(property="token_type", type="string", example="Bearer"),
+ *     @OA\Property(property="access_token", type="string", example="z4aMeWg3Hf..."),
+ *     @OA\Property(property="expires_in", type="integer", example=2592000),
+ *     @OA\Property(
+ *         property="user",
+ *         type="object",
+ *         required={"id","phone"},
+ *         @OA\Property(property="id", type="integer", example=1),
+ *         @OA\Property(property="phone", type="string", example="79998886644")
+ *     )
  * )
  *
  * @OA\Schema(

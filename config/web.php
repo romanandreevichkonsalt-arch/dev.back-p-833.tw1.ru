@@ -1,5 +1,8 @@
 <?php
 
+use app\services\SmsSenderInterface;
+use app\services\SmsSenderStub;
+
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
 
@@ -50,10 +53,17 @@ $config = [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
+                'POST api/v1/auth/request-code' => 'api/v1/auth/request-code',
+                'POST api/v1/auth/verify-code' => 'api/v1/auth/verify-code',
                 'GET api/v1/ping' => 'api/v1/ping/index',
                 'GET api/v1/profile/me' => 'api/v1/profile/me',
                 'GET swagger/json-schema' => 'swagger/json-schema',
             ],
+        ],
+    ],
+    'container' => [
+        'singletons' => [
+            SmsSenderInterface::class => SmsSenderStub::class,
         ],
     ],
     'modules' => [
