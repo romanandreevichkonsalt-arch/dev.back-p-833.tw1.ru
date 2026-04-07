@@ -2,6 +2,8 @@
 
 use app\services\SmsSenderInterface;
 use app\services\SmsSenderStub;
+use app\services\YandexIdService;
+use app\services\YandexIdServiceInterface;
 
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
@@ -55,6 +57,7 @@ $config = [
             'rules' => [
                 'POST api/v1/auth/request-code' => 'api/v1/auth/request-code',
                 'POST api/v1/auth/verify-code' => 'api/v1/auth/verify-code',
+                'POST api/v1/auth/yandex' => 'api/v1/auth/yandex-login',
                 'GET api/v1/ping' => 'api/v1/ping/index',
                 'GET api/v1/profile/me' => 'api/v1/profile/me',
                 'GET swagger/json-schema' => 'swagger/json-schema',
@@ -64,6 +67,9 @@ $config = [
     'container' => [
         'singletons' => [
             SmsSenderInterface::class => SmsSenderStub::class,
+            YandexIdServiceInterface::class => static function () use ($params): YandexIdServiceInterface {
+                return new YandexIdService($params['yandexId'] ?? []);
+            },
         ],
     ],
     'modules' => [

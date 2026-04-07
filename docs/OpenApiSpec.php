@@ -34,6 +34,10 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\PathItem(
+ *     path="/api/v1/auth/yandex"
+ * )
+ *
+ * @OA\PathItem(
  *     path="/swagger/json-schema"
  * )
  *
@@ -71,6 +75,13 @@ use OpenApi\Annotations as OA;
  *     required={"phone","code"},
  *     @OA\Property(property="phone", type="string", example="79998886644"),
  *     @OA\Property(property="code", type="string", example="123456")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="AuthYandexInput",
+ *     type="object",
+ *     required={"access_token"},
+ *     @OA\Property(property="access_token", type="string", example="y0_AgAAA...")
  * )
  *
  * @OA\Schema(

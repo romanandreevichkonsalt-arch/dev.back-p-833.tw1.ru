@@ -3,9 +3,11 @@
 namespace app\controllers\api\v1;
 
 use app\models\ApiAccessToken;
+use app\models\ExternalIdentity;
 use app\models\SmsCode;
 use app\models\User;
 use app\services\SmsSenderInterface;
+use app\services\YandexIdServiceInterface;
 use OpenApi\Annotations as OA;
 use Yii;
 use yii\web\BadRequestHttpException;
@@ -19,7 +21,7 @@ class AuthController extends ApiController
     public function behaviors(): array
     {
         $behaviors = parent::behaviors();
-        $behaviors['authenticator']['except'] = ['request-code', 'verify-code', 'options'];
+        $behaviors['authenticator']['except'] = ['request-code', 'verify-code', 'yandex-login', 'options'];
 
         return $behaviors;
     }
@@ -29,6 +31,7 @@ class AuthController extends ApiController
         return [
             'request-code' => ['POST', 'OPTIONS'],
             'verify-code' => ['POST', 'OPTIONS'],
+            'yandex-login' => ['POST', 'OPTIONS'],
         ];
     }
 
@@ -143,27 +146,84 @@ class AuthController extends ApiController
         $smsCode->used_at = date('Y-m-d H:i:s');
         $smsCode->save(false);
 
-        $rawToken = Yii::$app->security->generateRandomString(64);
-        $expiresAt = date('Y-m-d H:i:s', time() + self::TOKEN_TTL_SECONDS);
+        return $this->issueBearerToken($user);
+    }
 
-        $token = new ApiAccessToken([
-            'user_id' => (int) $user->id,
-            'token_hash' => hash('sha256', $rawToken),
-            'expires_at' => $expiresAt,
-        ]);
-        if (!$token->save()) {
-            throw new BadRequestHttpException('Не удалось выпустить токен.');
+    /**
+     * @OA\Post(
+     *     path="/api/v1/auth/yandex",
+     *     tags={"Авторизация"},
+     *     summary="Вход через Яндекс ID и выдача Bearer-токена",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(ref="#/components/schemas/AuthYandexInput")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Успешная авторизация через Яндекс ID",
+     *         @OA\JsonContent(ref="#/components/schemas/AuthVerifyCodeOutput")
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Некорректные входные данные"
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Не удалось подтвердить Яндекс ID"
+     *     )
+     * )
+     */
+    public function actionYandexLogin(): array
+    {
+        $body = Yii::$app->request->getBodyParams();
+        $accessToken = trim((string)($body['access_token'] ?? ''));
+        if ($accessToken === '') {
+            throw new BadRequestHttpException('Поле access_token обязательно.');
         }
 
-        return [
-            'token_type' => 'Bearer',
-            'access_token' => $rawToken,
-            'expires_in' => self::TOKEN_TTL_SECONDS,
-            'user' => [
-                'id' => (int) $user->id,
-                'phone' => $user->phone,
-            ],
-        ];
+        /** @var YandexIdServiceInterface $yandex */
+        $yandex = Yii::$container->get(YandexIdServiceInterface::class);
+        $profile = $yandex->fetchProfileByAccessToken($accessToken);
+
+        $transaction = Yii::$app->db->beginTransaction();
+        try {
+            $externalIdentity = ExternalIdentity::find()
+                ->where([
+                    'provider' => 'yandex',
+                    'provider_user_id' => (string)$profile['id'],
+                ])
+                ->one();
+
+            if ($externalIdentity !== null) {
+                $user = User::findOne((int)$externalIdentity->user_id);
+            } else {
+                $user = null;
+            }
+
+            if ($user === null) {
+                $user = $this->createUserForYandex((string)$profile['id'], $profile['display_name'] ?? null);
+            }
+
+            if ($externalIdentity === null) {
+                $externalIdentity = new ExternalIdentity([
+                    'user_id' => (int)$user->id,
+                    'provider' => 'yandex',
+                    'provider_user_id' => (string)$profile['id'],
+                    'email' => $profile['email'] ?? null,
+                    'raw_payload' => json_encode($profile['raw'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                ]);
+                if (!$externalIdentity->save()) {
+                    throw new BadRequestHttpException('Не удалось сохранить связку с Яндекс ID.');
+                }
+            }
+
+            $transaction->commit();
+        } catch (\Throwable $e) {
+            $transaction->rollBack();
+            throw $e;
+        }
+
+        return $this->issueBearerToken($user);
     }
 
     private function extractPhoneFromBody(): string
@@ -181,5 +241,45 @@ class AuthController extends ApiController
         }
 
         return $phone;
+    }
+
+    private function issueBearerToken(User $user): array
+    {
+        $rawToken = Yii::$app->security->generateRandomString(64);
+        $expiresAt = date('Y-m-d H:i:s', time() + self::TOKEN_TTL_SECONDS);
+
+        $token = new ApiAccessToken([
+            'user_id' => (int)$user->id,
+            'token_hash' => hash('sha256', $rawToken),
+            'expires_at' => $expiresAt,
+        ]);
+        if (!$token->save()) {
+            throw new BadRequestHttpException('Не удалось выпустить токен.');
+        }
+
+        return [
+            'token_type' => 'Bearer',
+            'access_token' => $rawToken,
+            'expires_in' => self::TOKEN_TTL_SECONDS,
+            'user' => [
+                'id' => (int)$user->id,
+                'phone' => $user->phone,
+            ],
+        ];
+    }
+
+    private function createUserForYandex(string $providerUserId, ?string $displayName): User
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $user = new User([
+                'phone' => '7' . str_pad((string)random_int(0, 9999999999), 10, '0', STR_PAD_LEFT),
+                'username' => $displayName ?? ('yandex_' . $providerUserId),
+            ]);
+            if ($user->save()) {
+                return $user;
+            }
+        }
+
+        throw new BadRequestHttpException('Не удалось создать пользователя для Яндекс ID.');
     }
 }
