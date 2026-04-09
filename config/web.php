@@ -55,6 +55,7 @@ $config = [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
+                'OPTIONS api/v1/<path:.+>' => 'api/v1/options/preflight',
                 'POST api/v1/auth/request-code' => 'api/v1/auth/request-code',
                 'POST api/v1/auth/verify-code' => 'api/v1/auth/verify-code',
                 'POST api/v1/auth/yandex' => 'api/v1/auth/yandex-login',

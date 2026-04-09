@@ -50,6 +50,10 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\PathItem(
+ *     path="/api/v1/{path}"
+ * )
+ *
+ * @OA\PathItem(
  *     path="/admin/default/index"
  * )
  *
