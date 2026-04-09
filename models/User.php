@@ -158,4 +158,9 @@ class User extends ActiveRecord implements IdentityInterface
         // For phone-auth users password login is disabled by design.
         return false;
     }
+
+    public function getProfile()
+    {
+        return $this->hasOne(UserProfile::class, ['user_id' => 'id']);
+    }
 }

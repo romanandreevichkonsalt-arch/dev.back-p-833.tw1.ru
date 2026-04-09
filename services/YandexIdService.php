@@ -43,6 +43,12 @@ class YandexIdService implements YandexIdServiceInterface
             'id' => $id,
             'email' => isset($payload['default_email']) ? (string)$payload['default_email'] : null,
             'display_name' => isset($payload['display_name']) ? (string)$payload['display_name'] : null,
+            'first_name' => isset($payload['first_name']) ? (string)$payload['first_name'] : null,
+            'last_name' => isset($payload['last_name']) ? (string)$payload['last_name'] : null,
+            'login' => isset($payload['login']) ? (string)$payload['login'] : null,
+            'avatar_url' => isset($payload['default_avatar_id']) && $payload['default_avatar_id'] !== ''
+                ? 'https://avatars.yandex.net/get-yapic/' . (string)$payload['default_avatar_id'] . '/islands-200'
+                : null,
             'raw' => $payload,
         ];
     }

@@ -116,9 +116,21 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="ProfileMeResponse",
  *     type="object",
- *     required={"id","username"},
+ *     required={"id","username","phone","profile"},
  *     @OA\Property(property="id", type="integer", example=100),
- *     @OA\Property(property="username", type="string", example="admin")
+ *     @OA\Property(property="username", type="string", example="admin"),
+ *     @OA\Property(property="phone", type="string", example="79998886644"),
+ *     @OA\Property(
+ *         property="profile",
+ *         type="object",
+ *         nullable=true,
+ *         @OA\Property(property="first_name", type="string", nullable=true, example="Иван"),
+ *         @OA\Property(property="last_name", type="string", nullable=true, example="Иванов"),
+ *         @OA\Property(property="display_name", type="string", nullable=true, example="Иван"),
+ *         @OA\Property(property="email", type="string", nullable=true, example="ivan@example.com"),
+ *         @OA\Property(property="avatar_url", type="string", nullable=true, example="https://avatars.yandex.net/get-yapic/123/islands-200"),
+ *         @OA\Property(property="yandex_login", type="string", nullable=true, example="ivan-login")
+ *     )
  * )
  */
 class OpenApiSpec

@@ -6,6 +6,7 @@ use app\models\ApiAccessToken;
 use app\models\ExternalIdentity;
 use app\models\SmsCode;
 use app\models\User;
+use app\models\UserProfile;
 use app\services\SmsSenderInterface;
 use app\services\YandexIdServiceInterface;
 use OpenApi\Annotations as OA;
@@ -217,6 +218,8 @@ class AuthController extends ApiController
                 }
             }
 
+            $this->upsertUserProfileFromYandex($user, $profile);
+
             $transaction->commit();
         } catch (\Throwable $e) {
             $transaction->rollBack();
@@ -281,5 +284,28 @@ class AuthController extends ApiController
         }
 
         throw new BadRequestHttpException('Не удалось создать пользователя для Яндекс ID.');
+    }
+
+    /**
+     * @param array{id:string,email:?string,display_name:?string,first_name:?string,last_name:?string,login:?string,avatar_url:?string,raw:array<string,mixed>} $profile
+     */
+    private function upsertUserProfileFromYandex(User $user, array $profile): void
+    {
+        $userProfile = UserProfile::find()->where(['user_id' => (int)$user->id])->one();
+        if ($userProfile === null) {
+            $userProfile = new UserProfile(['user_id' => (int)$user->id]);
+        }
+
+        $userProfile->first_name = $profile['first_name'] ?? null;
+        $userProfile->last_name = $profile['last_name'] ?? null;
+        $userProfile->display_name = $profile['display_name'] ?? null;
+        $userProfile->email = $profile['email'] ?? null;
+        $userProfile->avatar_url = $profile['avatar_url'] ?? null;
+        $userProfile->yandex_login = $profile['login'] ?? null;
+        $userProfile->raw_payload = json_encode($profile['raw'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if (!$userProfile->save()) {
+            throw new BadRequestHttpException('Не удалось сохранить профиль пользователя.');
+        }
     }
 }
