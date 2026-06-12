@@ -31,10 +31,11 @@ jobs:
       - name: Upload and deploy
         run: |
           SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          $SSH_CMD "${SSH_USER}@${SSH_HOST}" "mkdir -p ~/repo/${SITE_DOMAIN}"
           rsync -az --delete \
             --exclude='.git' --exclude='.env' --exclude='.env.*' \
             --exclude='runtime/' --exclude='vendor/' --exclude='web/assets/' \
             -e "$SSH_CMD" \
-            ./ "${SSH_USER}@${SSH_HOST}:~/data/repo/${SITE_DOMAIN}/"
+            ./ "${SSH_USER}@${SSH_HOST}:~/repo/${SITE_DOMAIN}/"
           $SSH_CMD "${SSH_USER}@${SSH_HOST}" \
             "bash ~/deploy/deploy-backend.sh '${SITE_DOMAIN}'"
