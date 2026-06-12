@@ -1,0 +1,37 @@
+name: Deploy to FastPanel
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+env:
+  SSH_HOST: 5.129.203.254
+  SSH_USER: dev_back_p_8_usr
+  SITE_DOMAIN: dev.back-p-833.tw1.ru
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload and deploy
+        run: |
+          rsync -az --delete \
+            --exclude='.git' --exclude='.env' --exclude='.env.*' \
+            --exclude='runtime/' --exclude='vendor/' --exclude='web/assets/' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./ "${SSH_USER}@${SSH_HOST}:~/data/repo/${SITE_DOMAIN}/"
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
+            "bash ~/deploy/deploy-backend.sh '${SITE_DOMAIN}'"
