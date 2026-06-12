@@ -29,7 +29,9 @@ jobs:
 
       - name: Upload and deploy
         run: |
-          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+          mkdir -p ~/.ssh/cm
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o ControlMaster=auto -o ControlPath=~/.ssh/cm/%r@%h:%p -o ControlPersist=120"
+          $SSH_CMD -fN "${SSH_USER}@${SSH_HOST}"
           $SSH_CMD "${SSH_USER}@${SSH_HOST}" "mkdir -p ~/repo/${SITE_DOMAIN}"
           rsync -az --delete \
             --exclude='.git' --exclude='.env' --exclude='.env.*' \
@@ -56,3 +58,4 @@ jobs:
           fi
           echo "Backend deploy completed for ${DOMAIN}"
           REMOTE
+          $SSH_CMD -O exit "${SSH_USER}@${SSH_HOST}" || true
