@@ -28,9 +28,38 @@ jobs:
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
+      - name: Install deploy script on server
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
+          $SSH_CMD "${SSH_USER}@${SSH_HOST}" "mkdir -p ~/deploy && cat > ~/deploy/deploy-backend.sh && chmod +x ~/deploy/deploy-backend.sh" <<'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -euo pipefail
+          DOMAIN="${1:?Usage: deploy-backend.sh <domain>}"
+          USER_HOME="/var/www/$(whoami)/data"
+          WWW_ROOT="${USER_HOME}/www/${DOMAIN}"
+          REPO_DIR="${USER_HOME}/repo/${DOMAIN}"
+          if [ ! -d "$REPO_DIR" ]; then
+            echo "ERROR: ${REPO_DIR} not found. Upload sources first."
+            exit 1
+          fi
+          cd "$REPO_DIR"
+          if [ -f composer.json ]; then
+            composer install --no-dev --optimize-autoloader --no-interaction
+          fi
+          if [ -d "${REPO_DIR}/web" ]; then
+            ln -sfn "${REPO_DIR}/web" "$WWW_ROOT"
+          fi
+          mkdir -p runtime web/assets 2>/dev/null || true
+          chmod -R 775 runtime web/assets 2>/dev/null || true
+          if [ -f yii ]; then
+            php yii migrate --interactive=0 || echo "WARN: migration step finished with non-zero exit"
+          fi
+          echo "Backend deploy completed for ${DOMAIN}"
+          DEPLOY_SCRIPT
+
       - name: Upload and deploy
         run: |
-          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
           $SSH_CMD "${SSH_USER}@${SSH_HOST}" "mkdir -p ~/repo/${SITE_DOMAIN}"
           rsync -az --delete \
             --exclude='.git' --exclude='.env' --exclude='.env.*' \
