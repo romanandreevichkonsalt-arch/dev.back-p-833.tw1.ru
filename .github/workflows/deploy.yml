@@ -26,16 +26,15 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
-          eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/deploy_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
       - name: Upload and deploy
         run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
           rsync -az --delete \
             --exclude='.git' --exclude='.env' --exclude='.env.*' \
             --exclude='runtime/' --exclude='vendor/' --exclude='web/assets/' \
-            -e "ssh -o StrictHostKeyChecking=no" \
+            -e "$SSH_CMD" \
             ./ "${SSH_USER}@${SSH_HOST}:~/data/repo/${SITE_DOMAIN}/"
-          ssh -o StrictHostKeyChecking=no "${SSH_USER}@${SSH_HOST}" \
+          $SSH_CMD "${SSH_USER}@${SSH_HOST}" \
             "bash ~/deploy/deploy-backend.sh '${SITE_DOMAIN}'"
