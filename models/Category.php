@@ -2,6 +2,9 @@
 
 namespace app\models;
 
+use app\behaviors\SoftDeleteBehavior;
+use app\helpers\SlugHelper;
+use app\models\traits\SoftDeleteTrait;
 use yii\behaviors\TimestampBehavior;
 use yii\db\ActiveQuery;
 use yii\db\ActiveRecord;
@@ -20,6 +23,7 @@ use yii\db\Expression;
  * @property int $sort_order
  * @property string $created_at
  * @property string $updated_at
+ * @property string|null $deleted_at
  *
  * @property Category|null $parent
  * @property Category[] $children
@@ -27,6 +31,8 @@ use yii\db\Expression;
  */
 class Category extends ActiveRecord
 {
+    use SoftDeleteTrait;
+
     public static function tableName(): string
     {
         return '{{%categories}}';
@@ -39,6 +45,7 @@ class Category extends ActiveRecord
                 'class' => TimestampBehavior::class,
                 'value' => new Expression('NOW()'),
             ],
+            SoftDeleteBehavior::class,
         ];
     }
 
@@ -62,6 +69,55 @@ class Category extends ActiveRecord
             ],
             [['parent_id'], 'validateNoCycle'],
         ];
+    }
+
+    public function attributeLabels(): array
+    {
+        return [
+            'id' => 'ID',
+            'parent_id' => 'Родитель',
+            'name' => 'Название',
+            'slug' => 'Slug',
+            'description' => 'Описание',
+            'seo_title' => 'SEO title',
+            'seo_description' => 'SEO description',
+            'seo_h1' => 'SEO H1',
+            'is_active' => 'Активна',
+            'sort_order' => 'Порядок',
+            'created_at' => 'Создана',
+            'updated_at' => 'Обновлена',
+        ];
+    }
+
+    public function beforeValidate(): bool
+    {
+        if (!parent::beforeValidate()) {
+            return false;
+        }
+
+        if (($this->slug === null || $this->slug === '') && $this->name !== '') {
+            $baseSlug = SlugHelper::fromString($this->name);
+            $this->slug = SlugHelper::ensureUnique($baseSlug, function (string $slug): bool {
+                $query = self::find()->where(['slug' => $slug]);
+                if (!$this->isNewRecord) {
+                    $query->andWhere(['<>', 'id', $this->id]);
+                }
+
+                return $query->exists();
+            });
+        }
+
+        return true;
+    }
+
+    public static function findBySlug(string $slug): ?self
+    {
+        return self::find()->where(['slug' => $slug])->one();
+    }
+
+    public function getDisplayLabel(): string
+    {
+        return $this->name . ' (' . $this->slug . ')';
     }
 
     public function validateNoCycle(string $attribute): void

@@ -51,6 +51,9 @@ $config = [
             ],
         ],
         'db' => $db,
+        'authManager' => [
+            'class' => 'yii\rbac\DbManager',
+        ],
         'urlManager' => [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
@@ -63,6 +66,7 @@ $config = [
                 'GET api/v1/profile/me' => 'api/v1/profile/me',
                 'GET api/v1/categories' => 'api/v1/categories/index',
                 'GET api/v1/categories/tree' => 'api/v1/categories/tree',
+                'GET api/v1/categories/slug/<slug:[\w-]+>' => 'api/v1/categories/view-by-slug',
                 'POST api/v1/categories' => 'api/v1/categories/create',
                 'GET api/v1/categories/<id:\d+>' => 'api/v1/categories/view',
                 'GET api/v1/categories/<id:\d+>/children' => 'api/v1/categories/children',

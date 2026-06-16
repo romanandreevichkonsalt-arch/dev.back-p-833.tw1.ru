@@ -58,6 +58,10 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\PathItem(
+ *     path="/api/v1/categories/slug/{slug}"
+ * )
+ *
+ * @OA\PathItem(
  *     path="/api/v1/categories/{id}"
  * )
  *

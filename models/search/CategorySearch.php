@@ -41,6 +41,21 @@ class CategorySearch extends Model
         ];
     }
 
+    public function attributeLabels(): array
+    {
+        return [
+            'q' => 'Поиск',
+            'parent_id' => 'Родитель',
+            'slug' => 'Slug',
+            'is_active' => 'Активна',
+            'has_products' => 'Есть товары',
+            'seo_title' => 'SEO title',
+            'seo_h1' => 'SEO H1',
+            'sort' => 'Сортировка',
+            'order' => 'Порядок',
+        ];
+    }
+
     public function search(array $params): ActiveDataProvider
     {
         $this->load($params, '');
@@ -78,7 +93,7 @@ class CategorySearch extends Model
         }
 
         if ($this->slug !== null && $this->slug !== '') {
-            $query->andWhere(['slug' => $this->slug]);
+            $query->andWhere(['like', 'slug', $this->slug]);
         }
 
         if ($this->is_active !== null) {

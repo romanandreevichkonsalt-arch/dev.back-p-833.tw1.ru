@@ -2,6 +2,8 @@
 
 namespace app\models;
 
+use app\behaviors\SoftDeleteBehavior;
+use app\models\traits\SoftDeleteTrait;
 use yii\behaviors\TimestampBehavior;
 use yii\db\ActiveQuery;
 use yii\db\ActiveRecord;
@@ -22,12 +24,16 @@ use yii\db\Expression;
  * @property string|null $seo_h1
  * @property string $created_at
  * @property string $updated_at
+ * @property string|null $deleted_at
  *
  * @property Category[] $categories
  * @property ProductAttribute[] $productAttributes
+ * @property ProductImage[] $images
  */
 class Product extends ActiveRecord
 {
+    use SoftDeleteTrait;
+
     public static function tableName(): string
     {
         return '{{%products}}';
@@ -40,6 +46,7 @@ class Product extends ActiveRecord
                 'class' => TimestampBehavior::class,
                 'value' => new Expression('NOW()'),
             ],
+            SoftDeleteBehavior::class,
         ];
     }
 
@@ -69,6 +76,18 @@ class Product extends ActiveRecord
     public function getProductAttributes(): ActiveQuery
     {
         return $this->hasMany(ProductAttribute::class, ['product_id' => 'id']);
+    }
+
+    public function getImages(): ActiveQuery
+    {
+        return $this->hasMany(ProductImage::class, ['product_id' => 'id'])
+            ->orderBy(['sort_order' => SORT_ASC, 'id' => SORT_ASC]);
+    }
+
+    public function getMainImage(): ActiveQuery
+    {
+        return $this->hasOne(ProductImage::class, ['product_id' => 'id'])
+            ->andWhere(['is_main' => true]);
     }
 
     public function toApiArray(bool $detailed = true): array
@@ -102,6 +121,16 @@ class Product extends ActiveRecord
             $data['attributes'] = array_map(
                 static fn (ProductAttribute $attribute): array => $attribute->toApiArray(),
                 $this->productAttributes
+            );
+            $data['images'] = array_map(
+                static fn (ProductImage $image): array => [
+                    'id' => (int) $image->id,
+                    'url' => $image->getUrl(),
+                    'alt' => $image->alt,
+                    'is_main' => (bool) $image->is_main,
+                    'sort_order' => (int) $image->sort_order,
+                ],
+                $this->images
             );
         }
 

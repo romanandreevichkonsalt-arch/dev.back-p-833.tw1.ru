@@ -2,40 +2,24 @@
 
 namespace app\modules\admin\controllers;
 
-use OpenApi\Annotations as OA;
-use yii\filters\AccessControl;
-use yii\web\Controller;
+use app\models\ApiAccessToken;
+use app\models\AttributeDefinition;
+use app\models\Category;
+use app\models\Product;
+use app\models\User;
 
-class DefaultController extends Controller
+class DefaultController extends AdminController
 {
-    public function behaviors(): array
-    {
-        return [
-            'access' => [
-                'class' => AccessControl::class,
-                'rules' => [
-                    [
-                        'allow' => true,
-                        'roles' => ['@'],
-                    ],
-                ],
-            ],
-        ];
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/admin/default/index",
-     *     tags={"Админка"},
-     *     summary="Стартовая страница модуля администрирования",
-     *     @OA\Response(
-     *         response=200,
-     *         description="HTML-страница админки"
-     *     )
-     * )
-     */
     public function actionIndex(): string
     {
-        return $this->render('index');
+        return $this->render('index', [
+            'stats' => [
+                'Категории' => Category::find()->count(),
+                'Товары' => Product::find()->count(),
+                'Атрибуты' => AttributeDefinition::find()->count(),
+                'Пользователи' => User::find()->count(),
+                'Активные токены' => ApiAccessToken::find()->where(['revoked_at' => null])->count(),
+            ],
+        ]);
     }
 }

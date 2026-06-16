@@ -35,6 +35,27 @@ class CatalogApiCest
         $I->seeResponseContainsJson(['items' => [['slug' => 'divany-i-kresla']]]);
     }
 
+    public function viewCategoryBySlug(FunctionalTester $I): void
+    {
+        $I->sendAjaxGetRequest('/index-test.php/api/v1/categories/slug/divany-i-kresla');
+        $I->seeResponseCodeIs(200);
+        $I->seeResponseContainsJson(['name' => 'Диваны и кресла', 'slug' => 'divany-i-kresla']);
+    }
+
+    public function filterCategoriesBySlug(FunctionalTester $I): void
+    {
+        $I->sendAjaxGetRequest('/index-test.php/api/v1/categories', ['slug' => 'kresla']);
+        $I->seeResponseCodeIs(200);
+        $I->seeResponseContainsJson(['items' => [['slug' => 'divany-i-kresla']]]);
+    }
+
+    public function filterProductsByCategorySlug(FunctionalTester $I): void
+    {
+        $I->sendAjaxGetRequest('/index-test.php/api/v1/products', ['category_slug' => 'pryamye']);
+        $I->seeResponseCodeIs(200);
+        $I->seeResponseContainsJson(['items' => [['sku' => 'SOFA-BRERA-BLUE']]]);
+    }
+
     public function listProductsWithAttributeFilter(FunctionalTester $I): void
     {
         $I->sendAjaxGetRequest('/index-test.php/api/v1/products', [

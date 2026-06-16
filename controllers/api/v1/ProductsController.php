@@ -50,7 +50,7 @@ class ProductsController extends ApiController
      *     @OA\Parameter(name="price_to", in="query", @OA\Schema(type="number")),
      *     @OA\Parameter(name="category_id", in="query", @OA\Schema(type="integer")),
      *     @OA\Parameter(name="category_ids", in="query", description="Через запятую", @OA\Schema(type="string", example="1,2")),
-     *     @OA\Parameter(name="category_slug", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="category_slug", in="query", description="Фильтр по slug категории (частичное совпадение)", @OA\Schema(type="string")),
      *     @OA\Parameter(name="seo_title", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="seo_h1", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="attrs[color]", in="query", description="Фильтр по атрибуту", @OA\Schema(type="string", example="синий")),
@@ -68,7 +68,7 @@ class ProductsController extends ApiController
     {
         $search = new ProductSearch();
         $provider = $search->search(Yii::$app->request->queryParams);
-        $provider->query->with(['categories', 'productAttributes.definition']);
+        $provider->query->with(['categories', 'productAttributes.definition', 'images']);
 
         return ApiPagination::format(
             $provider,
@@ -182,7 +182,7 @@ class ProductsController extends ApiController
     private function findProduct(int $id): Product
     {
         $product = Product::find()
-            ->with(['categories', 'productAttributes.definition'])
+            ->with(['categories', 'productAttributes.definition', 'images'])
             ->where(['id' => $id])
             ->one();
 

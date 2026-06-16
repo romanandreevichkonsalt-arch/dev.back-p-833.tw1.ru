@@ -26,4 +26,14 @@ class CategoryTest extends Unit
 
         $this->assertTrue($category->validate(['slug']));
     }
+
+    public function testAutoSlugFromName(): void
+    {
+        $category = new Category([
+            'name' => 'Диваны и кресла',
+        ]);
+        $category->validate();
+
+        $this->assertSame('divany-i-kresla', $category->slug);
+    }
 }

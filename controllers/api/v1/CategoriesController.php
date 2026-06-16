@@ -19,6 +19,7 @@ class CategoriesController extends ApiController
         $behaviors['authenticator']['except'] = [
             'index',
             'view',
+            'view-by-slug',
             'tree',
             'children',
             'options',
@@ -32,6 +33,7 @@ class CategoriesController extends ApiController
         return [
             'index' => ['GET', 'OPTIONS'],
             'view' => ['GET', 'OPTIONS'],
+            'view-by-slug' => ['GET', 'OPTIONS'],
             'tree' => ['GET', 'OPTIONS'],
             'children' => ['GET', 'OPTIONS'],
             'create' => ['POST', 'OPTIONS'],
@@ -47,7 +49,7 @@ class CategoriesController extends ApiController
      *     summary="Список категорий с фильтрацией",
      *     @OA\Parameter(name="q", in="query", @OA\Schema(type="string")),
      *     @OA\Parameter(name="parent_id", in="query", description="0 для корневых", @OA\Schema(type="integer")),
-     *     @OA\Parameter(name="slug", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="slug", in="query", description="Фильтр по slug (частичное совпадение)", @OA\Schema(type="string")),
      *     @OA\Parameter(name="is_active", in="query", @OA\Schema(type="boolean")),
      *     @OA\Parameter(name="has_products", in="query", @OA\Schema(type="boolean")),
      *     @OA\Parameter(name="seo_title", in="query", @OA\Schema(type="string")),
@@ -73,6 +75,7 @@ class CategoriesController extends ApiController
      *     tags={"Категории"},
      *     summary="Дерево категорий",
      *     @OA\Parameter(name="root_id", in="query", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="root_slug", in="query", description="Корневая категория по slug", @OA\Schema(type="string")),
      *     @OA\Parameter(name="depth", in="query", @OA\Schema(type="integer")),
      *     @OA\Response(response=200, description="Дерево категорий", @OA\JsonContent(ref="#/components/schemas/CategoryTreeResponse"))
      * )
@@ -80,7 +83,16 @@ class CategoriesController extends ApiController
     public function actionTree(): array
     {
         $rootId = Yii::$app->request->get('root_id');
+        $rootSlug = Yii::$app->request->get('root_slug');
         $depth = Yii::$app->request->get('depth');
+
+        if (($rootId === null || $rootId === '') && $rootSlug !== null && $rootSlug !== '') {
+            $rootCategory = Category::findBySlug((string) $rootSlug);
+            if ($rootCategory === null) {
+                throw new NotFoundHttpException('Категория не найдена.');
+            }
+            $rootId = $rootCategory->id;
+        }
 
         /** @var CategoryTreeService $service */
         $service = Yii::createObject(CategoryTreeService::class);
@@ -92,6 +104,21 @@ class CategoriesController extends ApiController
         return [
             'items' => array_map(static fn (Category $category): array => $category->toTreeNode(), $roots),
         ];
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/categories/slug/{slug}",
+     *     tags={"Категории"},
+     *     summary="Карточка категории по slug",
+     *     @OA\Parameter(name="slug", in="path", required=true, @OA\Schema(type="string", example="divany-i-kresla")),
+     *     @OA\Response(response=200, description="Категория", @OA\JsonContent(ref="#/components/schemas/Category")),
+     *     @OA\Response(response=404, description="Не найдена")
+     * )
+     */
+    public function actionViewBySlug(string $slug): array
+    {
+        return $this->findCategoryBySlug($slug)->toApiArray();
     }
 
     /**
@@ -224,6 +251,16 @@ class CategoriesController extends ApiController
     private function findCategory(int $id): Category
     {
         $category = Category::findOne($id);
+        if ($category === null) {
+            throw new NotFoundHttpException('Категория не найдена.');
+        }
+
+        return $category;
+    }
+
+    private function findCategoryBySlug(string $slug): Category
+    {
+        $category = Category::findBySlug($slug);
         if ($category === null) {
             throw new NotFoundHttpException('Категория не найдена.');
         }

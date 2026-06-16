@@ -55,8 +55,8 @@ jobs:
             rm -rf "$WWW_ROOT"
             ln -sfn "${REPO_DIR}/web" "$WWW_ROOT"
           fi
-          mkdir -p runtime web/assets
-          chmod -R 775 runtime web/assets 2>/dev/null || true
+          mkdir -p runtime web/assets web/uploads/products
+          chmod -R 775 runtime web/assets web/uploads 2>/dev/null || true
           if [ -f yii ]; then
             php yii migrate --interactive=0
           fi

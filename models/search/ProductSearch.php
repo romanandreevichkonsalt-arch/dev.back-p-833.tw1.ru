@@ -51,6 +51,23 @@ class ProductSearch extends Model
         ];
     }
 
+    public function attributeLabels(): array
+    {
+        return [
+            'q' => 'Поиск',
+            'slug' => 'Slug',
+            'sku' => 'SKU',
+            'category_id' => 'ID категории',
+            'category_slug' => 'Slug категории',
+            'is_active' => 'Активен',
+            'in_stock' => 'В наличии',
+            'price_from' => 'Цена от',
+            'price_to' => 'Цена до',
+            'seo_title' => 'SEO title',
+            'seo_h1' => 'SEO H1',
+        ];
+    }
+
     public function search(array $params): ActiveDataProvider
     {
         $this->load($params, '');
@@ -135,7 +152,7 @@ class ProductSearch extends Model
         if ($this->category_slug !== null && $this->category_slug !== '') {
             $query->innerJoin('{{%product_categories}} pc_slug', 'pc_slug.product_id = {{%products}}.id')
                 ->innerJoin('{{%categories}} c_slug', 'c_slug.id = pc_slug.category_id')
-                ->andWhere(['c_slug.slug' => $this->category_slug]);
+                ->andWhere(['like', 'c_slug.slug', $this->category_slug]);
         }
 
         $this->applyAttributeFilters($query);

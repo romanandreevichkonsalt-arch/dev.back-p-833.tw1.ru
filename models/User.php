@@ -2,16 +2,24 @@
 
 namespace app\models;
 
+use Yii;
 use yii\db\ActiveRecord;
 use yii\web\IdentityInterface;
 
+/**
+ * @property int $id
+ * @property string $phone
+ * @property string|null $username
+ * @property string|null $password_hash
+ * @property string|null $auth_key
+ * @property string $created_at
+ * @property string $updated_at
+ */
 class User extends ActiveRecord implements IdentityInterface
 {
     public $password;
-    public $authKey;
-    public $accessToken;
 
-    private static $users = [
+    private static array $legacyUsers = [
         '100' => [
             'id' => '100',
             'username' => 'admin',
@@ -41,7 +49,9 @@ class User extends ActiveRecord implements IdentityInterface
             [['phone'], 'match', 'pattern' => '/^7\d{10}$/'],
             [['phone'], 'unique'],
             [['username'], 'string', 'max' => 255],
+            [['password_hash', 'auth_key'], 'string', 'max' => 255],
             [['created_at', 'updated_at'], 'safe'],
+            [['password'], 'string', 'min' => 6],
         ];
     }
 
@@ -55,9 +65,6 @@ class User extends ActiveRecord implements IdentityInterface
         ];
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public static function findIdentity($id)
     {
         $user = static::findOne($id);
@@ -65,12 +72,9 @@ class User extends ActiveRecord implements IdentityInterface
             return $user;
         }
 
-        return isset(self::$users[$id]) ? new static(self::$users[$id]) : null;
+        return isset(self::$legacyUsers[$id]) ? new static(self::$legacyUsers[$id]) : null;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public static function findIdentityByAccessToken($token, $type = null)
     {
         $tokenHash = hash('sha256', $token);
@@ -83,7 +87,7 @@ class User extends ActiveRecord implements IdentityInterface
             return static::findIdentity($apiToken->user_id);
         }
 
-        foreach (self::$users as $legacyUser) {
+        foreach (self::$legacyUsers as $legacyUser) {
             if ($legacyUser['accessToken'] === $token) {
                 return new static($legacyUser);
             }
@@ -92,26 +96,18 @@ class User extends ActiveRecord implements IdentityInterface
         return null;
     }
 
-    /**
-     * Finds user by username
-     *
-     * @param string $username
-     * @return static|null
-     */
-    public static function findByUsername($username)
+    public static function findByUsername(string $username): ?self
     {
-        $user = static::find()->where(['username' => $username])->one();
-        if ($user !== null) {
-            return $user;
-        }
+        return static::find()->where(['username' => $username])->one();
+    }
 
-        foreach (self::$users as $user) {
-            if (strcasecmp($user['username'], $username) === 0) {
-                return new static($user);
-            }
-        }
-
-        return null;
+    public static function findAdminByUsername(string $username): ?self
+    {
+        return static::find()
+            ->where(['username' => $username])
+            ->andWhere(['not', ['password_hash' => null]])
+            ->andWhere(['<>', 'password_hash', ''])
+            ->one();
     }
 
     public static function findByPhone(string $phone): ?self
@@ -119,48 +115,62 @@ class User extends ActiveRecord implements IdentityInterface
         return static::find()->where(['phone' => $phone])->one();
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getId()
     {
         return $this->id;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getAuthKey()
+    public function getAuthKey(): string
     {
-        return $this->authKey ?? ('user-' . $this->getId());
+        return $this->auth_key ?? ('user-' . $this->getId());
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function validateAuthKey($authKey)
+    public function validateAuthKey($authKey): bool
     {
         return $this->getAuthKey() === $authKey;
     }
 
-    /**
-     * Validates password
-     *
-     * @param string $password password to validate
-     * @return bool if password provided is valid for current user
-     */
-    public function validatePassword($password)
+    public function validatePassword(string $password): bool
     {
+        if (!empty($this->password_hash)) {
+            return Yii::$app->security->validatePassword($password, $this->password_hash);
+        }
+
         if ($this->password !== null) {
             return $this->password === $password;
         }
 
-        // For phone-auth users password login is disabled by design.
         return false;
+    }
+
+    public function setPassword(string $password): void
+    {
+        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+    }
+
+    public function generateAuthKey(): void
+    {
+        $this->auth_key = Yii::$app->security->generateRandomString();
+    }
+
+    public function hasAdminAccess(): bool
+    {
+        if (Yii::$app->user->isGuest) {
+            return false;
+        }
+
+        $roles = Yii::$app->authManager->getRolesByUser((string) $this->id);
+
+        return $roles !== [];
     }
 
     public function getProfile()
     {
         return $this->hasOne(UserProfile::class, ['user_id' => 'id']);
+    }
+
+    public function getRoleNames(): array
+    {
+        return array_keys(Yii::$app->authManager->getRolesByUser((string) $this->id));
     }
 }
