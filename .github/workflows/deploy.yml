@@ -29,33 +29,36 @@ jobs:
 
       - name: Upload and deploy
         run: |
-          mkdir -p ~/.ssh/cm
-          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10 -o ControlMaster=auto -o ControlPath=~/.ssh/cm/%r@%h:%p -o ControlPersist=120"
-          $SSH_CMD -fN "${SSH_USER}@${SSH_HOST}"
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=10"
           $SSH_CMD "${SSH_USER}@${SSH_HOST}" "mkdir -p ~/repo/${SITE_DOMAIN}"
           rsync -az --delete \
             --exclude='.git' --exclude='.env' --exclude='.env.*' \
             --exclude='runtime/' --exclude='vendor/' --exclude='web/assets/' \
+            --exclude='config/db.php' \
             -e "$SSH_CMD" \
             ./ "${SSH_USER}@${SSH_HOST}:~/repo/${SITE_DOMAIN}/"
           $SSH_CMD "${SSH_USER}@${SSH_HOST}" bash -s "${SITE_DOMAIN}" <<'REMOTE'
           set -euo pipefail
           DOMAIN="$1"
-          USER_HOME="/var/www/$(whoami)/data"
+          USER_HOME="${HOME}"
           WWW_ROOT="${USER_HOME}/www/${DOMAIN}"
           REPO_DIR="${USER_HOME}/repo/${DOMAIN}"
           cd "$REPO_DIR"
+          export YII_ENV=prod
+          export YII_DEBUG=0
+          export COMPOSER_ALLOW_SUPERUSER=1
           if [ -f composer.json ]; then
-            composer install --no-dev --optimize-autoloader --no-interaction
+            composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+            composer run-script post-install-cmd --no-interaction || true
           fi
           if [ -d "${REPO_DIR}/web" ]; then
+            rm -rf "$WWW_ROOT"
             ln -sfn "${REPO_DIR}/web" "$WWW_ROOT"
           fi
-          mkdir -p runtime web/assets 2>/dev/null || true
+          mkdir -p runtime web/assets
           chmod -R 775 runtime web/assets 2>/dev/null || true
           if [ -f yii ]; then
-            php yii migrate --interactive=0 || echo "WARN: migration step finished with non-zero exit"
+            php yii migrate --interactive=0
           fi
           echo "Backend deploy completed for ${DOMAIN}"
           REMOTE
-          $SSH_CMD -O exit "${SSH_USER}@${SSH_HOST}" || true
