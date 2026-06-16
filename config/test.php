@@ -27,20 +27,35 @@ return [
             'basePath' => __DIR__ . '/../web/assets',
         ],
         'urlManager' => [
+            'enablePrettyUrl' => true,
             'showScriptName' => true,
-        ],
-        'user' => [
-            'identityClass' => 'app\models\User',
+            'rules' => [
+                'OPTIONS api/v1/<path:.+>' => 'api/v1/options/preflight',
+                'GET api/v1/categories' => 'api/v1/categories/index',
+                'GET api/v1/categories/tree' => 'api/v1/categories/tree',
+                'POST api/v1/categories' => 'api/v1/categories/create',
+                'GET api/v1/categories/<id:\d+>' => 'api/v1/categories/view',
+                'GET api/v1/categories/<id:\d+>/children' => 'api/v1/categories/children',
+                'PUT api/v1/categories/<id:\d+>' => 'api/v1/categories/update',
+                'PATCH api/v1/categories/<id:\d+>' => 'api/v1/categories/update',
+                'DELETE api/v1/categories/<id:\d+>' => 'api/v1/categories/delete',
+                'GET api/v1/products' => 'api/v1/products/index',
+                'POST api/v1/products' => 'api/v1/products/create',
+                'GET api/v1/products/<id:\d+>' => 'api/v1/products/view',
+                'PUT api/v1/products/<id:\d+>' => 'api/v1/products/update',
+                'PATCH api/v1/products/<id:\d+>' => 'api/v1/products/update',
+                'DELETE api/v1/products/<id:\d+>' => 'api/v1/products/delete',
+            ],
         ],
         'request' => [
             'cookieValidationKey' => 'test',
             'enableCsrfValidation' => false,
-            // but if you absolutely need it set cookie domain to localhost
-            /*
-            'csrfCookie' => [
-                'domain' => 'localhost',
+            'parsers' => [
+                'application/json' => 'yii\web\JsonParser',
             ],
-            */
+        ],
+        'user' => [
+            'identityClass' => 'app\models\User',
         ],
     ],
     'params' => $params,
