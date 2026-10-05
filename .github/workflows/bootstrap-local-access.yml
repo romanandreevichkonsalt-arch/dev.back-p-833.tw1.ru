@@ -1,0 +1,109 @@
+name: Bootstrap local access
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: bootstrap-local-access
+  cancel-in-progress: false
+
+env:
+  SSH_HOST: 5.129.203.254
+  SSH_USER: dev_back_p_8_usr
+  SITE_DOMAIN: dev.back-p-833.tw1.ru
+  APP_DIR: /var/www/dev_back_p_8_usr/data/app/dev.back-p-833.tw1.ru
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          KEY_FILE=~/.ssh/deploy_key
+          if echo "$SSH_PRIVATE_KEY" | grep -q 'BEGIN'; then
+            printf '%s' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            echo "$SSH_PRIVATE_KEY" | tr -d '\n\r ' | base64 -d > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+          ssh-keygen -y -f "$KEY_FILE" >/dev/null
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Install developer pubkey
+        run: |
+          set -euo pipefail
+          PUBKEY='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDkWyzNpfwxMp1uZWpWpJ1Jb55zUk/wRXSlFdxEyjtYz shichkov1996@gmail.com'
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}" \
+            "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && (grep -qF '$PUBKEY' ~/.ssh/authorized_keys || echo '$PUBKEY' >> ~/.ssh/authorized_keys) && echo pubkey_ok"
+
+      - name: Dump database
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}" bash -s <<'REMOTE'
+          set -euo pipefail
+          APP=/var/www/dev_back_p_8_usr/data/app/dev.back-p-833.tw1.ru
+          cd "$APP"
+          php -r '
+          $c = require "config/db.php";
+          if (!is_array($c)) { fwrite(STDERR, "bad db.php\n"); exit(1); }
+          preg_match("/dbname=([^;]+)/", $c["dsn"], $m);
+          $db = $m[1] ?? "";
+          $user = $c["username"] ?? "";
+          $pass = $c["password"] ?? "";
+          file_put_contents("/tmp/fabric_db_env", "DBNAME=".escapeshellarg($db)."\nDBUSER=".escapeshellarg($user)."\nDBPASS=".escapeshellarg($pass)."\n");
+          echo "dbname=$db user=$user\n";
+          '
+          # shellcheck disable=SC1091
+          eval "$(php -r '
+          $c = require "config/db.php";
+          preg_match("/dbname=([^;]+)/", $c["dsn"], $m);
+          echo "export DBNAME=" . escapeshellarg($m[1] ?? "") . "\n";
+          echo "export DBUSER=" . escapeshellarg($c["username"] ?? "") . "\n";
+          echo "export DBPASS=" . escapeshellarg($c["password"] ?? "") . "\n";
+          ')"
+          mysqldump -u "$DBUSER" -p"$DBPASS" --single-transaction --quick --routines --triggers \
+            "$DBNAME" | gzip -c > /tmp/fabric_dev_dump.sql.gz
+          ls -lh /tmp/fabric_dev_dump.sql.gz
+          REMOTE
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}:/tmp/fabric_dev_dump.sql.gz" ./fabric_dev_dump.sql.gz
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}" 'rm -f /tmp/fabric_dev_dump.sql.gz /tmp/fabric_db_env'
+          ls -lh ./fabric_dev_dump.sql.gz
+
+      - name: Upload dump artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fabric-dev-dump
+          path: fabric_dev_dump.sql.gz
+          retention-days: 3
+
+      - name: Collect server diagnostics
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}" bash -s <<'REMOTE' | tee server-diag.txt
+          set -euo pipefail
+          APP=/var/www/dev_back_p_8_usr/data/app/dev.back-p-833.tw1.ru
+          echo "=== php ==="; php -v | head -1
+          echo "=== cache size ==="; du -sh "$APP/runtime/cache" 2>/dev/null || true
+          echo "=== cache files ==="; find "$APP/runtime/cache" -type f 2>/dev/null | wc -l
+          echo "=== du top cache ==="; du -ah "$APP/runtime/cache" 2>/dev/null | sort -h | tail -20
+          if [ -x "$APP/yii" ]; then
+            cd "$APP"
+            php yii search/bench --query=диван --limit=5 --iterations=1 2>&1 | tail -100 || true
+          fi
+          REMOTE
+
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: fabric-server-diag
+          path: server-diag.txt
+          retention-days: 7
