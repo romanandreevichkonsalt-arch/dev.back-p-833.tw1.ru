@@ -2,10 +2,11 @@
 
 namespace app\controllers;
 
+use app\services\docs\OpenApiGeneratorService;
 use OpenApi\Annotations as OA;
-use OpenApi\Generator;
 use Yii;
 use yii\web\Controller;
+use yii\web\Response;
 
 class SwaggerController extends Controller
 {
@@ -32,18 +33,48 @@ class SwaggerController extends Controller
      */
     public function actionJsonSchema(): string
     {
-        header('Access-Control-Allow-Origin: *');
+        Yii::$app->response->format = Response::FORMAT_RAW;
+        Yii::$app->response->headers->set('Content-Type', 'application/json; charset=UTF-8');
+        Yii::$app->response->headers->set('Access-Control-Allow-Origin', '*');
 
-        $openapi = (new Generator())->generate(
-            [
-                Yii::getAlias('@app/docs'),
-                Yii::getAlias('@app/controllers'),
-                Yii::getAlias('@app/models'),
-            ],
-            null,
-            false
-        );
+        $service = new OpenApiGeneratorService();
 
-        return $openapi ? $openapi->toJson() : '{}';
+        $fileJson = $service->readFromRuntime();
+        if ($fileJson !== null && $service->isRuntimeFresh()) {
+            return $fileJson;
+        }
+
+        $cache = Yii::$app->cache;
+        $sourceVersion = $service->getSourceVersion();
+        $cached = $cache->get(OpenApiGeneratorService::CACHE_KEY);
+        if (
+            is_array($cached)
+            && ($cached['version'] ?? '') === $sourceVersion
+            && isset($cached['json'])
+            && $service->isValidJson($cached['json'])
+        ) {
+            return $cached['json'];
+        }
+
+        if ($fileJson !== null) {
+            return $fileJson;
+        }
+
+        try {
+            $json = $service->generateJson();
+        } catch (\Throwable $e) {
+            Yii::error('OpenAPI generation failed: ' . $e->getMessage(), __METHOD__);
+            Yii::$app->response->statusCode = 503;
+            return json_encode([
+                'message' => 'OpenAPI schema is not ready. Run: php yii open-api/generate',
+            ], JSON_UNESCAPED_UNICODE);
+        }
+
+        $cache->set(OpenApiGeneratorService::CACHE_KEY, [
+            'version' => $sourceVersion,
+            'json' => $json,
+        ], 86400);
+
+        return $json;
     }
 }

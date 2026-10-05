@@ -1,0 +1,27 @@
+{
+  "groups": [
+    {
+      "id": "a-plus",
+      "label": "А+",
+      "subcategories": []
+    },
+    {
+      "id": "line-1",
+      "label": "Линия 1",
+      "subcategories": []
+    }
+  ],
+  "collections": [
+    {
+      "id": "artemida",
+      "label": "Коллекция",
+      "title": "Артемида",
+      "titleUppercase": false,
+      "description": "Идеальный баланс формы и комфорта",
+      "href": "/catalog/artemida",
+      "ctaLabel": "Смотреть коллекцию",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/catalog/a-plus.webp", "alt": "Коллекция Артемида" },
+      "imagePosition": "center 30%"
+    }
+  ]
+}

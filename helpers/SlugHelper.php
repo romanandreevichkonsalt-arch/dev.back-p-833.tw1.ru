@@ -4,52 +4,29 @@ namespace app\helpers;
 
 class SlugHelper
 {
-    private const TRANSLIT_MAP = [
-        'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'e',
-        'ж' => 'zh', 'з' => 'z', 'и' => 'i', 'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm',
-        'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't', 'у' => 'u',
-        'ф' => 'f', 'х' => 'h', 'ц' => 'ts', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sch', 'ъ' => '',
-        'ы' => 'y', 'ь' => '', 'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
+    /** @var array<string, string> */
+    private const TRANSLIT = [
+        'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd',
+        'е' => 'e', 'ё' => 'e', 'ж' => 'zh', 'з' => 'z', 'и' => 'i',
+        'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm', 'н' => 'n',
+        'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't',
+        'у' => 'u', 'ф' => 'f', 'х' => 'h', 'ц' => 'ts', 'ч' => 'ch',
+        'ш' => 'sh', 'щ' => 'sch', 'ъ' => '', 'ы' => 'y', 'ь' => '',
+        'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
     ];
 
-    public static function fromString(string $value): string
+    public static function slugify(?string $text): string
     {
-        $value = mb_strtolower(trim($value), 'UTF-8');
-        $chars = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        $result = '';
-
-        foreach ($chars as $char) {
-            if (isset(self::TRANSLIT_MAP[$char])) {
-                $result .= self::TRANSLIT_MAP[$char];
-                continue;
-            }
-
-            if (preg_match('/[a-z0-9]/', $char)) {
-                $result .= $char;
-                continue;
-            }
-
-            if ($char === ' ' || $char === '_' || $char === '-') {
-                $result .= '-';
-            }
+        $text = trim((string)$text);
+        if ($text === '') {
+            return '';
         }
 
-        $slug = preg_replace('/-+/', '-', $result) ?? '';
-        $slug = trim((string) $slug, '-');
+        $text = mb_strtolower($text, 'UTF-8');
+        $text = strtr($text, self::TRANSLIT);
+        $text = (string)preg_replace('/[^a-z0-9]+/', '-', $text);
+        $text = trim($text, '-');
 
-        return $slug !== '' ? $slug : 'item';
-    }
-
-    public static function ensureUnique(string $baseSlug, callable $exists): string
-    {
-        $slug = $baseSlug;
-        $suffix = 2;
-
-        while ($exists($slug)) {
-            $slug = $baseSlug . '-' . $suffix;
-            ++$suffix;
-        }
-
-        return $slug;
+        return substr($text, 0, 64);
     }
 }

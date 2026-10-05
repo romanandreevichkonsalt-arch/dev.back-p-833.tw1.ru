@@ -1,0 +1,4 @@
+#!/bin/sh
+# Локальная копия: deploy/.ssh-askpass.sh (chmod 700, в .gitignore)
+# Пароль SSH для dev_back_p_8_usr@5.129.203.254 — только на вашей машине.
+exec echo 'ЗАМЕНИТЕ_НА_SSH_ПАРОЛЬ'

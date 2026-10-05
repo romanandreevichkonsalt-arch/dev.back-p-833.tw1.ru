@@ -2,24 +2,12 @@
 
 namespace app\modules\admin\controllers;
 
-use app\models\ApiAccessToken;
-use app\models\AttributeDefinition;
-use app\models\Category;
-use app\models\Product;
-use app\models\User;
+use yii\web\Response;
 
-class DefaultController extends AdminController
+class DefaultController extends BaseController
 {
-    public function actionIndex(): string
+    public function actionIndex(): Response
     {
-        return $this->render('index', [
-            'stats' => [
-                'Категории' => Category::find()->count(),
-                'Товары' => Product::find()->count(),
-                'Атрибуты' => AttributeDefinition::find()->count(),
-                'Пользователи' => User::find()->count(),
-                'Активные токены' => ApiAccessToken::find()->where(['revoked_at' => null])->count(),
-            ],
-        ]);
+        return $this->redirect(['/admin/dashboard/index']);
     }
 }

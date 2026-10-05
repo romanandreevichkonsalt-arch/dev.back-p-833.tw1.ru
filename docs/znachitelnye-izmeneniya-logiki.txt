@@ -1,0 +1,196 @@
+Значительные изменения логики и API (back-dev / Fabrika)
+Период: с ~август 2025 по 22.09.2026
+Критерий: смена правил расчёта, модели данных, контракта запроса/ответа или поведения эндпоинта (не косметика админки).
+
+═══════════════════════════════════════════════════════════════
+1. Каталог — модель данных и API v3
+═══════════════════════════════════════════════════════════════
+
+• Иерархия каталога переведена на цепочку: направление → коллекция (линейка) → категория → подкатегория → модель → SKU; удалены legacy CatalogType и привязка типа к модели/товару (catalog_groups переименованы в catalog_directions, добавлены catalog_categories).
+
+• Единый эндпоинт GET /api/v1/catalog/menu вместо разрозненных navigation/menu/products: меню, taxonomy, при scope — items, filters, meta; старые пути (/menu/products, /navigation, /products) помечены deprecated, но проксируют тот же handler.
+
+• GET /api/v1/catalog/menu/{slugs} — path-фильтр: сегменты автоматически распознаются как направление, линейка, категория или подкатегория; несколько slug комбинируются.
+
+• GET /api/v1/catalog/products без scope отдаёт все SKU (с последующей логикой round-robin); со scope/slug — фильтр раздела.
+
+• Query collection переосмыслен: collection = направление (a-plus), modelLine = линейка (artemida); frontend slugs через url_slug на категориях/подкатегориях.
+
+• Taxonomy меню (2026-09): groups/categories в GET /catalog/menu — категории товаров (Диваны, Кресла), а не коллекции A+/Линия 1; дедупликация subcategories в navigation.
+
+• GET /api/v1/catalog/products?collection=true — контракт ответа: items[] не плоский список SKU, а секции по линейкам (slug, label, items[], total); пагинация page/perPage по линейкам, meta.layout=collectionGroups.
+
+• Карточка товара GET /api/v1/catalog/products/{slug}: добавлен блок fabrics[] (варианты тканей), pricing через единый buildPricingApiPayload; customProductSlug на модели; кастом-SKU (is_custom) доступен по slug, но скрыт из витрины и поиска.
+
+• Фильтры color[]/texture[]: парсинг нескольких значений из query (repeat, [] и comma) — раньше PHP/Yii оставлял только последнее значение при color=a&color=b.
+
+• Группировка листинга (каталог, плоский items[]): sort=default и popular — round-robin по model_id (смешение моделей и цветов, ротация оттенков); внутри модели для default — цена ↑, затем ткань/цвет; collectionKey — не ставить подряд SKU одной линейки мебели. sort=alphabet — отдельно: round-robin по линейкам A→Z × цена ↑.
+
+• Приоритетные SKU (/admin/search?tab=catalog, search_catalog_priority_models): первыми на page 1 в каталоге (default/popular, нужен scope direction) и в поиске; настройка = образец SKU на модель + № сортировки.
+
+• sort=alphabet — режим «линейки по алфавиту» для листинга и collectionGroups; не смешивать с default.
+
+• Swatches в листинге: при ≤3 цветах модели — все без dedupe; иначе до 3 уникальных оттенков + swatchCount.
+
+• Импорт/sync SKU: формула title/slug менялась несколько раз — подкатегория вместо «Диван»; добавлены коллекция ткани и design_code; default-товар «{подкатегория} {коллекция} кастом» на модель.
+
+• API габаритов и фильтров: overallSize строкой, cornerDepth отдельно; sleepingPlace=1, facets functions/dimensions.width; has_sleeping_place и corner_depth_mm с импорта.
+
+• POST /api/v1/catalog/models/{slug}/3d-file — отдельная загрузка 3D; polygons/file3d не отдаются в GET товара.
+
+• GET /api/v1/library-products — отдельная выдача для библиотеки 3D (CMS «Библиотека»).
+
+═══════════════════════════════════════════════════════════════
+2. Поиск
+═══════════════════════════════════════════════════════════════
+
+• GET /api/v1/search и GET /api/v1/search/products — pipeline по title: token-fix → exact → cascade → similar (Levenshtein) → legacy ranker; поля matchType, matchedQuery; correction = token-fix, не description.
+
+• Лимит товаров в autocomplete: default 5, max 20; кастом-SKU исключены; round-robin по моделям в выдаче search/products.
+
+• Bootstrap/recommended: таблица search_recommended_products, flat recommended + recommendedGroups в API.
+
+• История поиска сознательно не в API — только localStorage на фронте.
+
+═══════════════════════════════════════════════════════════════
+3. Избранное и гостевая сессия
+═══════════════════════════════════════════════════════════════
+
+• Избранное: productId = slug SKU (не numeric id); Bearer или X-Session-ID на add/remove/check/list.
+
+• POST /api/v1/favorites/sync и guestSync при auth (verify-code, yandex, dealer login) — merge гостевой сессии в user; merge корзины и избранного при том же session id.
+
+═══════════════════════════════════════════════════════════════
+4. ЛК дилера — auth, профиль, цены
+═══════════════════════════════════════════════════════════════
+
+• ЛК дилера: email+password вместо SMS; POST /api/v1/dealer/auth/login|logout, GET|PUT /api/v1/dealer/profile.
+
+• HttpBearerAuth на API: index больше не исключается глобально — иначе GET /dealer/profile и /dealer/bonuses не поднимали identity из Bearer.
+
+• Gate PROFILE_INCOMPLETE: 403 на cart/orders/catalog products для незаполненного профиля.
+
+• Dual pricing: retailPrice + dealerPrice при Bearer дилера; персональная скидка dealer_profiles.personal_discount_percent; фильтр/сортировка каталога по dealerPrice для дилера; search price = розница.
+
+• GET /dealer/price-list → common + personal; assignedManager в profile; GET /dealer/bonuses — промокоды и кэшбек.
+
+• POST /api/v1/dadata/suggest/city|address — без auth (маршрут da-data).
+
+═══════════════════════════════════════════════════════════════
+5. Промокоды, кэшбек, акции каталога
+═══════════════════════════════════════════════════════════════
+
+• Промокоды: POST/DELETE /api/v1/cart/promo, PATCH/DELETE /api/v1/cart/cashback; только для дилера с grant; гость — 401 на apply.
+
+• Custom promo без valid_until — действует до первого использования (игнор устаревшего expires_at grant).
+
+• Scope промокода по catalog_model_id — скидка только по строкам этой модели.
+
+• Промокод XOR кэшбек в заказе; порядок скидок: дилерская → промокод → кэшбек; total с учётом cashless surcharge.
+
+• Кэшбек: cap min(requested, balance, subtotal − promo); позже — cap половиной subtotal после дилерской скидки (162e99a); начисление от subtotal после дилерской скидки; отмена заказа — handleOrderCancelled и refund accrual.
+
+• GET /dealer/bonuses — ближайшее сгорание: сумма и дата первой к списанию порции (efa1747).
+
+• Catalog promotions (акции): условия в catalog_promotions (% от розницы или fixed_amount = цена за единицу); активность по starts_at/ends_at; для дилера dealerPrice считается на лету (единая акционная цена, без персональной скидки); бейдж «Акция» + badges[]; гостевая витрина — позже отдельно.
+
+• Корзина/чекаут: строки hasCatalogPromotion — промокод не применяется; кэшбек списывается только с non-promotion subtotal (начисление без изменений); discounts.promotion — сумма catalogPromotionDiscount; баннеры — price_current текст, не влияет на расчёт.
+
+• API ЛКД промо: GET /api/v1/dealer/promotions/banners, /popup, /sales — видимость по датам, ручные цены на баннере, реальные template_id промокодов.
+
+═══════════════════════════════════════════════════════════════
+6. PROMO-MKT админка — смена логики после первой реализации
+═══════════════════════════════════════════════════════════════
+
+• Попап был частью каждой записи promotion_banners → один singleton promotion_popup, отдельная форма на вкладке.
+
+• У баннеров убраны admin_title, sort_order; идентификация в списке по headline.
+
+• is_active у баннеров и акций убран — только valid_from/valid_to (и datetime у акций).
+
+• dismiss_until_end_of_day у попапа удалён.
+
+• Приоритет пересекающихся акций удалён из БД и резолвера.
+
+• Промокод на баннере/попапе: с inline-формы на экране → модалка привязки + PromotionPromoTemplateResolver.
+
+• Создание custom-промокода: с отдельной страницы create → модалка на index.
+
+═══════════════════════════════════════════════════════════════
+7. Корзина и заказы
+═══════════════════════════════════════════════════════════════
+
+• Корзина и заказы гостя по X-Session-ID; merge при login.
+
+• Дилер: comment и attachment на уровне позиции корзины (PATCH comment, POST/DELETE attachment); при POST /orders перенос в order items; гость — 403 на comment/file.
+
+• POST /orders: atomic create с items[{productId, quantity, comment?}] без корзины; multipart itemAttachments[productId] (любые форматы, 50 МБ); legacy — items без quantity тянут корзину.
+
+• Файлы заказа только на позициях, не на уровне заказа целиком (контракт с фронтом).
+
+• Order API: uiStatus, progressStep; OrderSummary — itemsCount, затем images[] + extraCount вместо previewImages[]; line items — image, href, specLine, attachment.downloadUrl; paymentMethod, documents[], cashlessSurchargeAmount.
+
+• GET /orders/{number}/items/{productId}/attachment и documents/{id} — скачивание.
+
+• Snapshot цен на позиции заказа: retailPrice, dealerPrice, paidLineTotal, discounts breakdown.
+
+• Дилерский заказ — заявка менеджеру; гость — pending_payment + ЮKassa (см. ниже).
+
+═══════════════════════════════════════════════════════════════
+8. Оплата ЮKassa (гость)
+═══════════════════════════════════════════════════════════════
+
+• POST /orders для гостя → status=pending_payment, paymentConfirmationUrl; корзина не очищается до успешной оплаты.
+
+• Webhook POST /api/v1/payments/yookassa/webhook; синхронизация статуса при GET заказа; GET orders/{number}/payment-status.
+
+• Чеки 54-ФЗ в create payment (ФФД 1.2, email/phone fallback для guest); paymentExternalId в API заказа.
+
+• Cron order/cancel-unpaid — отмена неоплаченных через N часов.
+
+═══════════════════════════════════════════════════════════════
+9. CMS и страницы (контракт API)
+═══════════════════════════════════════════════════════════════
+
+• HeroBannerPayload: алиасы title/subtitle (раньше только collectionTitle/tagline) — влияет на все GET /pages/*.
+
+• ApiCacheInvalidator после save блоков контента — иначе API отдавал stale до TTL.
+
+• Главная collections[]: id слайдов = slug направления (catalog_direction_id), не catalog_collection_id.
+
+• Page content images: forPageContent — src = large variant, не medium (каталог по-прежнему medium).
+
+• GET /api/v1/pages/about, /vacancies, /vacancies/{slug}; leads type=vacancy; about с jobs[] round-robin.
+
+• Журнал, партнёры, FAQ и др. — unified block editors; валидация POST блокирует тихую потерю данных.
+
+═══════════════════════════════════════════════════════════════
+10. Медиа в API
+═══════════════════════════════════════════════════════════════
+
+• CatalogImage: src + srcSet (mini, medium, large, original); resolvePrimaryImagePayload fallback в листинге.
+
+• Media ID в CMS picker → публичные URL через MediaUrlResolver; regenerate-variants для large.
+
+═══════════════════════════════════════════════════════════════
+11. Импорт (логика данных, не UI)
+═══════════════════════════════════════════════════════════════
+
+• Импорт тканей v2: одна строка = цвет коллекции; async import с очередью; slug модели {collection}-{title} для уникальности.
+
+• Импорт моделей v2/v3: матрица цен 1–25 категорий; default SKU «кастом»; purge каталога с каскадом заказов при полном reimport.
+
+• Product sync: model × fabric collections × colors; is_custom для кастом-SKU.
+
+═══════════════════════════════════════════════════════════════
+12. OpenAPI и инфра API
+═══════════════════════════════════════════════════════════════
+
+• Генерация openapi.json через php yii open-api/generate (offline), /swagger/json-schema отдаёт файл — не генерация на каждый HTTP-запрос.
+
+• Известный блокер dev: nginx без HTTP_AUTHORIZATION → 401 на Bearer (конфиг сервера, не репозиторий).
+
+═══════════════════════════════════════════════════════════════
+
+Документ собран по memory-bank/activeContext.md, memory-bank/tasks.md и истории git master.
+Дата: 22.09.2026.

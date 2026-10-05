@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "id": "toscana",
+      "title": "Диван Тоскана",
+      "type": "Прямой",
+      "collection": "Коллекция Softness",
+      "price": "159 800 ₽",
+      "to": "/catalog/softness/divany/toscana",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/toscana.webp", "alt": "Диван Тоскана" },
+      "imagePosition": "center"
+    },
+    {
+      "id": "turin",
+      "title": "Диван Турин",
+      "type": "Прямой",
+      "collection": "Коллекция А+",
+      "price": "289 900 ₽",
+      "to": "/catalog/a-plus/divany/turin",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/turin.webp", "alt": "Диван Турин" },
+      "imagePosition": "center"
+    },
+    {
+      "id": "stenli",
+      "title": "Диван Стенли",
+      "type": "Прямой",
+      "collection": "Коллекция А+",
+      "price": "350 900 ₽",
+      "to": "/catalog/a-plus/divany/stenli",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/stenli.webp", "alt": "Диван Стенли" },
+      "imagePosition": "center"
+    }
+  ]
+}

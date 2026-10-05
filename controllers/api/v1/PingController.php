@@ -6,6 +6,14 @@ use OpenApi\Annotations as OA;
 
 class PingController extends ApiController
 {
+    public function behaviors(): array
+    {
+        $behaviors = parent::behaviors();
+        $behaviors['authenticator']['except'] = ['index', 'options'];
+
+        return $behaviors;
+    }
+
     /**
      * @OA\Get(
      *     path="/api/v1/ping",

@@ -1,0 +1,63 @@
+{
+  "seo": {
+    "title": "Контакты — МФ Анна",
+    "description": "Адреса салонов, телефоны и форма обратной связи."
+  },
+  "hero": {
+    "title": "МФ АННА",
+    "subtitle": "Если нужна консультация, помощь в выборе мебели или информация о сотрудничестве — мы на связи",
+    "imageDesktop": {
+      "src": "https://dev.back-p-833.tw1.ru/images/contacts/hero.webp",
+      "alt": "Контакты"
+    },
+    "imageMobile": {
+      "src": "https://dev.back-p-833.tw1.ru/images/contacts/hero.webp",
+      "alt": "Контакты"
+    }
+  },
+  "info": {
+    "phone": "+7 (989) 423-20-00",
+    "phoneHref": "tel:+79894232000",
+    "email": "mebelanna@internet.ru",
+    "address": "ул. Пушкина 30, Батайск",
+    "telegram": "",
+    "vkontakte": "",
+    "max": ""
+  },
+  "contact": {
+    "title": "Остались вопросы?",
+    "subtitle": "Оставьте заявку — мы перезвоним",
+    "image": {
+      "src": "https://dev.back-p-833.tw1.ru/images/contacts/form-photo.webp",
+      "alt": "Салон"
+    },
+    "privacyPolicyUrl": "https://dev.back-p-833.tw1.ru/files/privacy-policy.pdf",
+    "userAgreementUrl": ""
+  },
+  "regions": [
+    {
+      "id": "rostov",
+      "name": "Ростовская область",
+      "pointsCount": 2,
+      "defaultOpen": true,
+      "stores": [
+        {
+          "id": "rostov-1",
+          "name": "Салон «Анна»",
+          "address": "г. Ростов-на-Дону, ул. Пушкинская, 18",
+          "coordinates": [39.702095, 47.222176],
+          "phone": "+7 (989) 423-20-00",
+          "hours": "Пн-Вс 10:00-20:00"
+        },
+        {
+          "id": "rostov-2",
+          "name": "Салон «Анна»",
+          "address": "г. Батайск, ул. Пушкина, 30",
+          "coordinates": [39.751944, 47.138333],
+          "phone": "+7 (989) 423-20-00",
+          "hours": "Пн-Вс 10:00-20:00"
+        }
+      ]
+    }
+  ]
+}

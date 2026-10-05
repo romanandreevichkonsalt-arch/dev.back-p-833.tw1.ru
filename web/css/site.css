@@ -86,3 +86,8 @@ a.desc:after {
 .form-group {
     margin-bottom: 1rem;
 }
+
+.form-control,
+.form-select {
+    padding: 5px 10px;
+}

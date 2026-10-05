@@ -1,0 +1,18 @@
+{
+  "frequent": ["прямой диван", "угловой диван", "модульный диван", "матрас", "кресло"],
+  "categories": [
+    { "id": "sofas", "label": "Диваны", "icon": "search-sofa", "href": "/catalog/a-plus/divany" }
+  ],
+  "recommended": [
+    {
+      "id": "toscana",
+      "title": "Диван Тоскана",
+      "type": "Прямой",
+      "collection": "Коллекция Softness",
+      "price": "159 800 ₽",
+      "to": "/catalog/softness/divany/toscana",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/toscana.webp", "alt": "Диван Тоскана" },
+      "imagePosition": "center"
+    }
+  ]
+}

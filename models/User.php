@@ -2,24 +2,19 @@
 
 namespace app\models;
 
-use Yii;
 use yii\db\ActiveRecord;
 use yii\web\IdentityInterface;
 
-/**
- * @property int $id
- * @property string $phone
- * @property string|null $username
- * @property string|null $password_hash
- * @property string|null $auth_key
- * @property string $created_at
- * @property string $updated_at
- */
 class User extends ActiveRecord implements IdentityInterface
 {
-    public $password;
+    public const TYPE_CUSTOMER = 'customer';
+    public const TYPE_DEALER = 'dealer';
 
-    private static array $legacyUsers = [
+    public $password;
+    public $authKey;
+    public $accessToken;
+
+    private static $users = [
         '100' => [
             'id' => '100',
             'username' => 'admin',
@@ -44,14 +39,18 @@ class User extends ActiveRecord implements IdentityInterface
     public function rules(): array
     {
         return [
-            [['phone'], 'required'],
+            [['phone'], 'required', 'when' => static fn (self $model): bool => $model->isCustomer() && !$model->isDealer()],
             [['phone'], 'string', 'max' => 11],
-            [['phone'], 'match', 'pattern' => '/^7\d{10}$/'],
+            [['phone'], 'match', 'pattern' => '/^7\d{10}$/', 'when' => static fn (self $model): bool => $model->phone !== null && $model->phone !== ''],
             [['phone'], 'unique'],
             [['username'], 'string', 'max' => 255],
-            [['password_hash', 'auth_key'], 'string', 'max' => 255],
-            [['created_at', 'updated_at'], 'safe'],
-            [['password'], 'string', 'min' => 6],
+            [['username'], 'unique'],
+            [['username'], 'required', 'when' => static fn (self $model): bool => $model->isDealer()],
+            [['type'], 'in', 'range' => [self::TYPE_CUSTOMER, self::TYPE_DEALER]],
+            [['password_hash'], 'string', 'max' => 255],
+            [['is_blocked', 'subscription'], 'boolean'],
+            [['subscription'], 'default', 'value' => false],
+            [['profile_completed_at', 'created_at', 'updated_at'], 'safe'],
         ];
     }
 
@@ -67,12 +66,12 @@ class User extends ActiveRecord implements IdentityInterface
 
     public static function findIdentity($id)
     {
-        $user = static::findOne($id);
+        $user = static::findOne(['id' => $id, 'is_blocked' => false]);
         if ($user !== null) {
             return $user;
         }
 
-        return isset(self::$legacyUsers[$id]) ? new static(self::$legacyUsers[$id]) : null;
+        return isset(self::$users[$id]) ? new static(self::$users[$id]) : null;
     }
 
     public static function findIdentityByAccessToken($token, $type = null)
@@ -84,10 +83,13 @@ class User extends ActiveRecord implements IdentityInterface
             ->one();
 
         if ($apiToken !== null) {
-            return static::findIdentity($apiToken->user_id);
+            $user = static::findOne(['id' => $apiToken->user_id, 'is_blocked' => false]);
+            if ($user !== null) {
+                return $user;
+            }
         }
 
-        foreach (self::$legacyUsers as $legacyUser) {
+        foreach (self::$users as $legacyUser) {
             if ($legacyUser['accessToken'] === $token) {
                 return new static($legacyUser);
             }
@@ -96,17 +98,26 @@ class User extends ActiveRecord implements IdentityInterface
         return null;
     }
 
-    public static function findByUsername(string $username): ?self
+    public static function findByUsername($username)
     {
-        return static::find()->where(['username' => $username])->one();
+        $user = static::find()->where(['username' => $username])->one();
+        if ($user !== null) {
+            return $user;
+        }
+
+        foreach (self::$users as $user) {
+            if (strcasecmp($user['username'], $username) === 0) {
+                return new static($user);
+            }
+        }
+
+        return null;
     }
 
-    public static function findAdminByUsername(string $username): ?self
+    public static function findDealerByUsername(string $username): ?self
     {
         return static::find()
-            ->where(['username' => $username])
-            ->andWhere(['not', ['password_hash' => null]])
-            ->andWhere(['<>', 'password_hash', ''])
+            ->where(['username' => $username, 'type' => self::TYPE_DEALER])
             ->one();
     }
 
@@ -120,48 +131,72 @@ class User extends ActiveRecord implements IdentityInterface
         return $this->id;
     }
 
-    public function getAuthKey(): string
+    public function getAuthKey()
     {
-        return $this->auth_key ?? ('user-' . $this->getId());
+        return $this->authKey ?? ('user-' . $this->getId());
     }
 
-    public function validateAuthKey($authKey): bool
+    public function validateAuthKey($authKey)
     {
         return $this->getAuthKey() === $authKey;
     }
 
-    public function validatePassword(string $password): bool
+    public function validatePassword($password)
     {
-        if (!empty($this->password_hash)) {
-            return Yii::$app->security->validatePassword($password, $this->password_hash);
-        }
-
         if ($this->password !== null) {
             return $this->password === $password;
         }
 
-        return false;
+        if ($this->password_hash === null || $this->password_hash === '') {
+            return false;
+        }
+
+        return \Yii::$app->security->validatePassword($password, $this->password_hash);
     }
 
     public function setPassword(string $password): void
     {
-        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+        $this->password_hash = \Yii::$app->security->generatePasswordHash($password);
     }
 
-    public function generateAuthKey(): void
+    public function isDealer(): bool
     {
-        $this->auth_key = Yii::$app->security->generateRandomString();
+        return $this->type === self::TYPE_DEALER;
     }
 
-    public function hasAdminAccess(): bool
+    public function isCustomer(): bool
     {
-        if (Yii::$app->user->isGuest) {
-            return false;
+        return $this->type === self::TYPE_CUSTOMER || $this->type === null || $this->type === '';
+    }
+
+    public function isProfileComplete(): bool
+    {
+        if (!$this->isDealer()) {
+            return true;
         }
 
-        $roles = Yii::$app->authManager->getRolesByUser((string) $this->id);
+        if ($this->profile_completed_at !== null) {
+            return true;
+        }
 
-        return $roles !== [];
+        $profile = $this->dealerProfile;
+
+        return $profile !== null && $profile->isProfileComplete($this);
+    }
+
+    public function markProfileCompleteIfReady(): void
+    {
+        if (!$this->isDealer() || $this->profile_completed_at !== null) {
+            return;
+        }
+
+        $profile = $this->dealerProfile;
+        if ($profile === null || !$profile->isProfileComplete($this)) {
+            return;
+        }
+
+        $this->profile_completed_at = date('Y-m-d H:i:s');
+        $this->save(false, ['profile_completed_at', 'updated_at']);
     }
 
     public function getProfile()
@@ -169,8 +204,51 @@ class User extends ActiveRecord implements IdentityInterface
         return $this->hasOne(UserProfile::class, ['user_id' => 'id']);
     }
 
-    public function getRoleNames(): array
+    public function getDealerProfile()
     {
-        return array_keys(Yii::$app->authManager->getRolesByUser((string) $this->id));
+        return $this->hasOne(DealerProfile::class, ['user_id' => 'id']);
+    }
+
+    public function getDisplayName(): string
+    {
+        if ($this->isDealer()) {
+            $dealerProfile = $this->dealerProfile;
+            if ($dealerProfile !== null) {
+                if ($dealerProfile->manager_name !== null && trim($dealerProfile->manager_name) !== '') {
+                    return trim($dealerProfile->manager_name);
+                }
+
+                if ($dealerProfile->company_name !== '') {
+                    return $dealerProfile->company_name;
+                }
+            }
+        }
+
+        $profile = $this->profile;
+        if ($profile !== null) {
+            $name = $profile->display_name
+                ?? trim(($profile->first_name ?? '') . ' ' . ($profile->last_name ?? ''));
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        return (string)($this->username ?: 'Пользователь #' . $this->id);
+    }
+
+    public function getFormattedPhone(): string
+    {
+        $phone = (string)$this->phone;
+        if (strlen($phone) === 11 && str_starts_with($phone, '7')) {
+            return sprintf(
+                '+7 (%s) %s-%s-%s',
+                substr($phone, 1, 3),
+                substr($phone, 4, 3),
+                substr($phone, 7, 2),
+                substr($phone, 9, 2)
+            );
+        }
+
+        return $phone !== '' ? $phone : '—';
     }
 }

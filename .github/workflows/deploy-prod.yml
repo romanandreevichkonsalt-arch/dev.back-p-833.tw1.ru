@@ -1,0 +1,74 @@
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod-${{ github.repository }}
+  cancel-in-progress: true
+
+env:
+  SSH_HOST: 5.129.203.254
+  SSH_USER: dev_back_p_8_usr
+  SITE_DOMAIN: dev.back-p-833.tw1.ru
+  DEPLOY_BASE: /var/www/dev_back_p_8_usr/data
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "::error::GitHub secret SSH_PRIVATE_KEY is not set."
+            echo "Add it: Settings → Secrets → Actions. Value: base64 of ~/.ssh/github_actions_deploy on prod server."
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          KEY_FILE=~/.ssh/deploy_key
+          if echo "$SSH_PRIVATE_KEY" | grep -q 'BEGIN'; then
+            printf '%s' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            echo "$SSH_PRIVATE_KEY" | tr -d '\n\r ' | base64 -d > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+          if ! ssh-keygen -y -f "$KEY_FILE" > /dev/null 2>&1; then
+            echo "::error::SSH_PRIVATE_KEY is invalid. Use base64 of private key or PEM text."
+            exit 1
+          fi
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Verify SSH connection
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            "${SSH_USER}@${SSH_HOST}" "echo connected; pwd"
+
+      - name: Upload and deploy
+        run: |
+          SSH_CMD="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          RSYNC_RSH="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          REMOTE="${SSH_USER}@${SSH_HOST}"
+          REMOTE_REPO="${DEPLOY_BASE}/repo/${SITE_DOMAIN}"
+
+          $SSH_CMD "$REMOTE" "mkdir -p '${REMOTE_REPO}'"
+
+          rsync -az --delete \
+            --filter='P config/db.php' \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='config/db.php' \
+            --exclude='runtime/' \
+            --exclude='vendor/' \
+            --exclude='web/assets/' \
+            --exclude='web/uploads/' \
+            -e "$RSYNC_RSH" \
+            ./ "${REMOTE}:${REMOTE_REPO}/"
+
+          $SSH_CMD "$REMOTE" "bash '${REMOTE_REPO}/deploy/deploy-backend.sh' '${SITE_DOMAIN}'"

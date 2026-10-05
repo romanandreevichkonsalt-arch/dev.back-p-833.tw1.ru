@@ -1,0 +1,10 @@
+# Codeception API test suite
+
+actor: ApiTester
+bootstrap: _bootstrap.php
+modules:
+    enabled:
+        - Yii2:
+            configFile: 'config/test.php'
+            applicationClass: 'yii\web\Application'
+        - Asserts

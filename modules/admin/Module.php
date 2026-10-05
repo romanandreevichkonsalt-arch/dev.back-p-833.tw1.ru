@@ -8,13 +8,15 @@ class Module extends \yii\base\Module
 {
     public $controllerNamespace = 'app\modules\admin\controllers';
 
-    public $defaultRoute = 'default/index';
+    public $defaultRoute = 'dashboard';
 
     public $layout = 'main';
 
     public function init(): void
     {
         parent::init();
-        Yii::$app->user->loginUrl = ['/admin/auth/login'];
+
+        Yii::$app->language = 'ru-RU';
+        $this->layoutPath = '@app/modules/admin/views/layouts';
     }
 }

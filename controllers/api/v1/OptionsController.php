@@ -23,12 +23,21 @@ class OptionsController extends Controller
     {
         $behaviors = parent::behaviors();
 
+        $origins = Yii::$app->params['corsOrigins'] ?? ['*'];
+
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => ['*'],
-                'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+                'Origin' => $origins,
+                'Access-Control-Request-Method' => ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
+                'Access-Control-Expose-Headers' => [
+                    'X-Total-Count',
+                    'X-Page',
+                    'X-Per-Page',
+                    'X-Sort',
+                    'X-Scope-Mode',
+                ],
                 'Access-Control-Allow-Credentials' => false,
             ],
         ];

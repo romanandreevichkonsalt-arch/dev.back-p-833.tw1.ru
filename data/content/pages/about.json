@@ -1,0 +1,49 @@
+{
+  "seo": {
+    "title": "О нас — МФ Анна",
+    "description": "Мебельная фабрика «Анна» — 30 лет семейного бизнеса и культуры создания мебели."
+  },
+  "hero": {
+    "label": "О нас",
+    "brandTitle": "МФ Анна",
+    "tagline": "Мастерство создания эстетики жизни",
+    "imageDesktop": { "src": "https://dev.back-p-833.tw1.ru/images/about/hero-desktop.webp", "alt": "Команда МФ Анна" },
+    "imageMobile": { "src": "https://dev.back-p-833.tw1.ru/images/about/hero-mobile.webp", "alt": "Команда МФ Анна" }
+  },
+  "intro": {
+    "paragraphs": [
+      "Проектируя мебель, мы создаём объекты, которые становятся частью жизни людей.",
+      "Уже 30 лет фабрика «Анна» развивается как семейный бизнес, сохраняя внимание к деталям и качеству."
+    ],
+    "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/intro.webp", "alt": "Кресло МФ Анна в интерьере" }
+  },
+  "community": {
+    "title": "Объединяем талантливых людей в сообщество единомышленников",
+    "cards": [
+      { "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/community-1.webp", "alt": "Команда за работой" } },
+      { "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/community-2.webp", "alt": "Мастера цеха" } },
+      { "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/community-3.webp", "alt": "Дизайнеры" } },
+      { "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/community-4.webp", "alt": "Производство" } }
+    ]
+  },
+  "timeline": {
+    "stages": [
+      {
+        "year": "1995",
+        "label": "1995",
+        "text": "Все началось с камерного семейного производства.",
+        "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/timeline-1995.webp", "alt": "Мастер на производстве" }
+      },
+      {
+        "year": "2017–2019",
+        "label": "2017–2019",
+        "text": "Масштабирование производства и обновление оборудования.",
+        "image": { "src": "https://dev.back-p-833.tw1.ru/images/about/timeline-2017.webp", "alt": "Производственный процесс" }
+      }
+    ]
+  },
+  "jobsIntro": {
+    "title": "Создавайте вместе с нами",
+    "text": "Ищем тех, кто разделяет наш взгляд на архитектуру комфорта."
+  }
+}

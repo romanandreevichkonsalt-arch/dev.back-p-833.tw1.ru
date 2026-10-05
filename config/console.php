@@ -12,6 +12,12 @@ $config = [
         '@bower' => '@vendor/bower-asset',
         '@npm'   => '@vendor/npm-asset',
         '@tests' => '@app/tests',
+        '@webroot' => dirname(__DIR__) . '/web',
+    ],
+    'container' => [
+        'definitions' => [
+            \app\services\cache\ApiResponseCache::class => \app\services\cache\ApiResponseCache::class,
+        ],
     ],
     'components' => [
         'cache' => [
@@ -26,8 +32,10 @@ $config = [
             ],
         ],
         'db' => $db,
-        'authManager' => [
-            'class' => 'yii\rbac\DbManager',
+        'mailer' => [
+            'class' => \yii\symfonymailer\Mailer::class,
+            'viewPath' => '@app/mail',
+            'useFileTransport' => true,
         ],
     ],
     'params' => $params,
@@ -40,7 +48,7 @@ $config = [
     */
 ];
 
-if (YII_ENV_DEV && class_exists('yii\gii\Module')) {
+if (YII_ENV_DEV) {
     // configuration adjustments for 'dev' environment
     $config['bootstrap'][] = 'gii';
     $config['modules']['gii'] = [
@@ -48,14 +56,12 @@ if (YII_ENV_DEV && class_exists('yii\gii\Module')) {
     ];
     // configuration adjustments for 'dev' environment
     // requires version `2.1.21` of yii2-debug module
-    if (class_exists('yii\debug\Module')) {
-        $config['bootstrap'][] = 'debug';
-        $config['modules']['debug'] = [
-            'class' => 'yii\debug\Module',
-            // uncomment the following to add your IP if you are not connecting from localhost.
-            //'allowedIPs' => ['127.0.0.1', '::1'],
-        ];
-    }
+    $config['bootstrap'][] = 'debug';
+    $config['modules']['debug'] = [
+        'class' => 'yii\debug\Module',
+        // uncomment the following to add your IP if you are not connecting from localhost.
+        //'allowedIPs' => ['127.0.0.1', '::1'],
+    ];
 }
 
 return $config;

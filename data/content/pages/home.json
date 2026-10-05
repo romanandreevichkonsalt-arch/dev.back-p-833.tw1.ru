@@ -1,0 +1,76 @@
+{
+  "seo": {
+    "title": "МФ Анна — мебель, которая формирует пространство",
+    "description": "Мебельная фабрика Анна — коллекции диванов и кресел для современного интерьера."
+  },
+  "hero": {
+    "collectionLabel": "Коллекция",
+    "collectionTitle": "А+",
+    "tagline": "Формы и материалы, свободные от компромиссов в каждой детали",
+    "year": "2026",
+    "imageDesktop": { "src": "https://dev.back-p-833.tw1.ru/images/home/hero-desktop.webp", "alt": "Коллекция А+" },
+    "imageMobile": { "src": "https://dev.back-p-833.tw1.ru/images/home/hero-mobile.webp", "alt": "Коллекция А+" }
+  },
+  "philosophy": {
+    "text": "Мы создаем мебельные решения, которые формируют пространство и задают характер интерьера."
+  },
+  "collections": [
+    {
+      "id": "a-plus",
+      "title": "А+",
+      "titleUppercase": true,
+      "slides": [
+        {
+          "label": "Диваны",
+          "href": "/catalog/a-plus/divany",
+          "image": { "src": "https://dev.back-p-833.tw1.ru/images/home/collection-sofas.webp", "alt": "Диваны коллекции А+" },
+          "objectPosition": "center 30%"
+        }
+      ]
+    }
+  ],
+  "products": [
+    {
+      "number": "01",
+      "name": "Диван Стенли",
+      "collection": "Коллекция А+",
+      "fabric": "Ткань: букле Гуччи 100",
+      "price": "350 900₽",
+      "swatchCount": "+8",
+      "layout": "featured",
+      "imagePosition": "center",
+      "to": "/catalog/a-plus/divany/stenli",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/stenli.webp", "alt": "Диван Стенли" }
+    }
+  ],
+  "partners": {
+    "intro": "Наш опыт — ваш фундамент для развития бизнеса в сфере мебели.",
+    "cards": [
+      {
+        "title": "Стать партнёром",
+        "href": "/partners",
+        "text": "Откройте салон мебели Анна в своём городе.",
+        "image": { "src": "https://dev.back-p-833.tw1.ru/images/home/partners.webp", "alt": "Партнёрам" },
+        "imagePosition": "center 35%"
+      },
+      {
+        "title": "Дизайнерам",
+        "href": "/designers",
+        "text": "Инструменты и поддержка для проектирования интерьеров.",
+        "image": { "src": "https://dev.back-p-833.tw1.ru/images/home/designers.webp", "alt": "Дизайнерам" },
+        "imagePosition": "center 15%"
+      }
+    ]
+  },
+  "journal": [
+    {
+      "number": "01",
+      "title": "Мягкий центр комнаты: как оформить зону вокруг дивана",
+      "date": "07.10.2025",
+      "excerpt": "",
+      "to": "/journal/geometriya-komforta",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/journal/geometriya-komforta.webp", "alt": "Зона вокруг дивана" },
+      "imagePosition": "center 28%"
+    }
+  ]
+}

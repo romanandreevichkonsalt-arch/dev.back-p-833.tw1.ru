@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "turin",
+      "title": "Диван Турин",
+      "collection": "Коллекция А+",
+      "href": "/catalog/a-plus/divany/turin",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/turin.webp", "alt": "Диван Турин" },
+      "imagePosition": "center",
+      "badge": { "text": "Хит продаж", "variant": "hit" }
+    },
+    {
+      "id": "toscana",
+      "title": "Диван Тоскана",
+      "collection": "Коллекция Softness",
+      "href": "/catalog/softness/divany/toscana",
+      "image": { "src": "https://dev.back-p-833.tw1.ru/images/products/toscana.webp", "alt": "Диван Тоскана" },
+      "imagePosition": "center",
+      "badge": null
+    }
+  ]
+}

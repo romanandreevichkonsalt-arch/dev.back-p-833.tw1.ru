@@ -2,6 +2,8 @@
 
 namespace app\controllers\api\v1;
 
+use app\models\User;
+use Yii;
 use yii\filters\auth\HttpBearerAuth;
 use yii\filters\ContentNegotiator;
 use yii\filters\Cors;
@@ -31,19 +33,28 @@ abstract class ApiController extends Controller
             ],
         ];
 
+        $origins = \Yii::$app->params['corsOrigins'] ?? ['*'];
+
         $behaviors['corsFilter'] = [
             'class' => Cors::class,
             'cors' => [
-                'Origin' => ['*'],
-                'Access-Control-Request-Method' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+                'Origin' => $origins,
+                'Access-Control-Request-Method' => ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
                 'Access-Control-Request-Headers' => ['*'],
+                'Access-Control-Expose-Headers' => [
+                    'X-Total-Count',
+                    'X-Page',
+                    'X-Per-Page',
+                    'X-Sort',
+                    'X-Scope-Mode',
+                ],
                 'Access-Control-Allow-Credentials' => false,
             ],
         ];
 
         $behaviors['authenticator'] = [
             'class' => HttpBearerAuth::class,
-            'except' => ['options', 'index'],
+            'except' => ['options'],
         ];
 
         return $behaviors;
@@ -54,5 +65,17 @@ abstract class ApiController extends Controller
         return [
             'index' => ['GET', 'OPTIONS'],
         ];
+    }
+
+    protected function resolveOptionalUser(): ?User
+    {
+        $header = Yii::$app->request->headers->get('Authorization');
+        if ($header === null || !preg_match('/^Bearer\s+(\S+)$/i', $header, $matches)) {
+            return null;
+        }
+
+        $identity = User::findIdentityByAccessToken($matches[1]);
+
+        return $identity instanceof User ? $identity : null;
     }
 }

@@ -7,6 +7,7 @@ use app\models\ExternalIdentity;
 use app\models\SmsCode;
 use app\models\User;
 use app\models\UserProfile;
+use app\services\guest\GuestDataSyncService;
 use app\services\SmsSenderInterface;
 use app\services\YandexIdServiceInterface;
 use OpenApi\Annotations as OA;
@@ -16,7 +17,6 @@ use yii\web\UnauthorizedHttpException;
 
 class AuthController extends ApiController
 {
-    private const SMS_CODE_TTL_SECONDS = 300;
     private const TOKEN_TTL_SECONDS = 2592000;
 
     public function behaviors(): array
@@ -71,8 +71,13 @@ class AuthController extends ApiController
             }
         }
 
-        $code = (string) random_int(100000, 999999);
-        $expiresAt = date('Y-m-d H:i:s', time() + self::SMS_CODE_TTL_SECONDS);
+        $codeLength = (int)(Yii::$app->params['smsCodeLength'] ?? 4);
+        $min = (int)str_pad('1', $codeLength, '0');
+        $max = (int)str_repeat('9', $codeLength);
+        $code = str_pad((string)random_int($min, $max), $codeLength, '0', STR_PAD_LEFT);
+
+        $ttl = (int)(Yii::$app->params['smsCodeTtl'] ?? 60);
+        $expiresAt = date('Y-m-d H:i:s', time() + $ttl);
 
         $smsCode = new SmsCode([
             'user_id' => (int) $user->id,
@@ -89,9 +94,8 @@ class AuthController extends ApiController
         $smsSender->sendCode($phone, $code);
 
         return [
-            'phone' => $phone,
-            'code' => $code,
-            'expires_in' => self::SMS_CODE_TTL_SECONDS,
+            'ok' => true,
+            'expires_in' => $ttl,
         ];
     }
 
@@ -100,6 +104,7 @@ class AuthController extends ApiController
      *     path="/api/v1/auth/verify-code",
      *     tags={"Авторизация"},
      *     summary="Проверяет SMS-код и возвращает Bearer-токен",
+     *     description="При sessionId (X-Session-ID или тело) в ответе guestSync — автоматический merge гостевого избранного и корзины. Ручной POST /api/v1/favorites/sync и POST /api/v1/cart/sync идемпотентны.",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(ref="#/components/schemas/AuthVerifyCodeInput")
@@ -121,8 +126,9 @@ class AuthController extends ApiController
         $phone = $this->normalizePhone($body['phone'] ?? '');
         $code = trim((string) ($body['code'] ?? ''));
 
-        if (!preg_match('/^\d{6}$/', $code)) {
-            throw new BadRequestHttpException('Код должен содержать 6 цифр.');
+        $codeLength = (int)(Yii::$app->params['smsCodeLength'] ?? 4);
+        if (!preg_match('/^\d{' . $codeLength . '}$/', $code)) {
+            throw new BadRequestHttpException("Код должен содержать {$codeLength} цифр.");
         }
 
         $smsCode = SmsCode::find()
@@ -155,6 +161,7 @@ class AuthController extends ApiController
      *     path="/api/v1/auth/yandex",
      *     tags={"Авторизация"},
      *     summary="Вход через Яндекс ID и выдача Bearer-токена",
+     *     description="При sessionId (X-Session-ID или тело) в ответе guestSync — автоматический merge гостевого избранного и корзины.",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(ref="#/components/schemas/AuthYandexInput")
@@ -261,13 +268,10 @@ class AuthController extends ApiController
         }
 
         return [
-            'token_type' => 'Bearer',
             'access_token' => $rawToken,
+            'token_type' => 'Bearer',
             'expires_in' => self::TOKEN_TTL_SECONDS,
-            'user' => [
-                'id' => (int)$user->id,
-                'phone' => $user->phone,
-            ],
+            'guestSync' => (new GuestDataSyncService())->syncForCurrentRequest($user),
         ];
     }
 

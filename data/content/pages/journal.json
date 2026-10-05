@@ -1,0 +1,44 @@
+{
+  "seo": {
+    "title": "Журнал — МФ Анна",
+    "description": "Статьи о дизайне интерьера и мебели."
+  },
+  "hero": {
+    "title": "МФ АННА",
+    "subtitle": "Как создаётся архитектура комфорта: эстетика, фактуры, проекты",
+    "imageDesktop": {
+      "src": "https://dev.back-p-833.tw1.ru/images/journal/hero.webp",
+      "alt": "Журнал"
+    },
+    "imageMobile": {
+      "src": "https://dev.back-p-833.tw1.ru/images/journal/hero.webp",
+      "alt": "Журнал"
+    }
+  },
+  "categories": [
+    {
+      "id": "process",
+      "label": "Архитектура процессов",
+      "icon": "journal-process",
+      "items": []
+    },
+    {
+      "id": "interior",
+      "label": "Интерьерные проекты",
+      "icon": "journal-interior",
+      "items": []
+    },
+    {
+      "id": "textures",
+      "label": "Исследование фактур",
+      "icon": "journal-textures",
+      "items": []
+    },
+    {
+      "id": "interviews",
+      "label": "Интервью с дизайнерами и командой",
+      "icon": "journal-interviews",
+      "items": []
+    }
+  ]
+}
