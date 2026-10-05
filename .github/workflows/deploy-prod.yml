@@ -3,6 +3,8 @@ name: Deploy Production
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.github/workflows/bootstrap-local-access.yml'
   workflow_dispatch:
 
 concurrency:
