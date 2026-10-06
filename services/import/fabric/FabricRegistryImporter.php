@@ -158,7 +158,7 @@ class FabricRegistryImporter
             $result->stats['errors']++;
 
             if ($importRun !== null) {
-                $importRun->error_message = $exception->getMessage();
+                $importRun->assignErrorMessage($exception->getMessage());
                 $this->persistRunState($importRun, $result, CatalogImportRun::STATUS_FAILED);
             }
 
@@ -189,10 +189,7 @@ class FabricRegistryImporter
 
     private function persistRunStats(CatalogImportRun $importRun, FabricRegistryImportResult $result): void
     {
-        $payload = $result->toArray();
-        unset($payload['rows']);
-        $payload['stats'] = $result->stats;
-        $importRun->setStats($payload);
+        $importRun->setStats($result->toStatsPayload());
         $importRun->save(false, ['stats_json']);
     }
 
@@ -218,7 +215,7 @@ class FabricRegistryImporter
                 (int)$importRun->total_rows
             );
         }
-        $importRun->setStats($result->toArray());
+        $importRun->setStats($result->toStatsPayload());
         $importRun->save(false);
     }
 

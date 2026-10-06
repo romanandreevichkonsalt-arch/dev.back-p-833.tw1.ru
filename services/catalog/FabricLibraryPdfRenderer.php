@@ -6,8 +6,6 @@ use app\models\CatalogFabricCollection;
 use app\models\CatalogFabricColor;
 use app\models\MediaFile;
 use app\services\media\LocalMediaStorage;
-use Mpdf\Mpdf;
-use Mpdf\Output\Destination;
 use yii\helpers\Html;
 
 class FabricLibraryPdfRenderer
@@ -15,49 +13,6 @@ class FabricLibraryPdfRenderer
     public function __construct(
         private readonly LocalMediaStorage $mediaStorage = new LocalMediaStorage(),
     ) {
-    }
-
-    /**
-     * @param iterable<CatalogFabricCollection> $collections
-     */
-    public function renderToFile(string $absolutePath, iterable $collections): void
-    {
-        if (!class_exists(Mpdf::class)) {
-            throw new \RuntimeException('Библиотека mPDF не установлена. Выполните composer install на сервере.');
-        }
-
-        $tempDir = \Yii::getAlias('@runtime/mpdf');
-        if (!is_dir($tempDir)) {
-            mkdir($tempDir, 0775, true);
-        }
-
-        $mpdf = new Mpdf([
-            'mode' => 'utf-8',
-            'format' => 'A4',
-            'default_font' => 'dejavusans',
-            'tempDir' => $tempDir,
-            'margin_left' => 14,
-            'margin_right' => 14,
-            'margin_top' => 16,
-            'margin_bottom' => 16,
-            'simpleTables' => true,
-            'packTableData' => true,
-        ]);
-
-        $mpdf->SetTitle('Библиотека тканей');
-        $mpdf->WriteHTML($this->renderStyles());
-        $mpdf->WriteHTML($this->renderCover());
-
-        $first = true;
-        foreach ($collections as $collection) {
-            $mpdf->WriteHTML($this->renderCollection($collection, !$first));
-            $first = false;
-            if (function_exists('gc_collect_cycles')) {
-                gc_collect_cycles();
-            }
-        }
-
-        $mpdf->Output($absolutePath, Destination::FILE);
     }
 
     /**

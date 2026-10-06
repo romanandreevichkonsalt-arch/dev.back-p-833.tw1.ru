@@ -60,8 +60,9 @@ class CatalogLibraryFabricsService
             'perPage' => $perPage,
         ];
 
-        if (FabricLibraryArchiveUrls::exists()) {
-            $meta['texturesArchiveUrl'] = FabricLibraryArchiveUrls::publicUrl();
+        $archiveUrl = FabricLibraryArchiveUrls::apiArchiveUrl();
+        if ($archiveUrl !== null) {
+            $meta['texturesArchiveUrl'] = $archiveUrl;
         }
 
         return $meta;

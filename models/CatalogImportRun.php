@@ -84,6 +84,30 @@ class CatalogImportRun extends ActiveRecord
         $this->stats_json = json_encode($stats, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
+    public function assignErrorMessage(string $message): void
+    {
+        $message = trim($message);
+        if ($message === '') {
+            $this->error_message = null;
+
+            return;
+        }
+
+        $maxBytes = 60000;
+        if (strlen($message) <= $maxBytes) {
+            $this->error_message = $message;
+
+            return;
+        }
+
+        $suffix = '…';
+        $truncated = $message;
+        while ($truncated !== '' && strlen($truncated . $suffix) > $maxBytes) {
+            $truncated = mb_substr($truncated, 0, mb_strlen($truncated) - 1);
+        }
+        $this->error_message = $truncated . $suffix;
+    }
+
     /**
      * @return array<string, mixed>
      */

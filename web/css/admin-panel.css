@@ -2585,6 +2585,13 @@ body.admin-modal-open {
     padding-bottom: 2px;
 }
 
+.admin-fabric-import__download {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    padding-bottom: 2px;
+}
+
 .admin-import-loader {
     position: fixed;
     inset: 0;
@@ -3804,8 +3811,13 @@ body.admin-import-loading:not(.admin-import-loading--disabled) {
     }
 
     .admin-fabric-import__checks,
-    .admin-fabric-import__actions {
+    .admin-fabric-import__actions,
+    .admin-fabric-import__download {
         grid-column: 1 / -1;
+    }
+
+    .admin-fabric-import__download {
+        justify-content: flex-end;
     }
 }
 

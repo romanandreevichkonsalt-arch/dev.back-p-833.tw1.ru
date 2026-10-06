@@ -116,7 +116,7 @@ return [
         'mailruPublicRoot' => '',
     ],
     'fabricLibraryArchive' => [
-        'relativePath' => 'files/library-fabrics.pdf',
+        'relativePath' => 'files/library-fabrics.zip',
     ],
     'dadataApiKey' => getenv('DADATA_API_KEY') ?: '',
     'dadataSecretKey' => getenv('DADATA_SECRET_KEY') ?: '',

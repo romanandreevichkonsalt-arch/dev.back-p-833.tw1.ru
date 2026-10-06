@@ -70,9 +70,9 @@ class FabricImportRunService
 
         if ($run->file_path === null || $run->file_path === '' || !is_file($run->file_path)) {
             $run->status = CatalogImportRun::STATUS_FAILED;
-            $run->error_message = 'Файл импорта не найден.';
+            $run->assignErrorMessage('Файл импорта не найден.');
             $run->finished_at = date('Y-m-d H:i:s');
-            $run->save(false);
+            $run->save(false, ['status', 'error_message', 'finished_at']);
 
             return;
         }
@@ -129,9 +129,9 @@ class FabricImportRunService
             $run = $this->findRun($runId);
             if (!$run->isTerminal()) {
                 $run->status = CatalogImportRun::STATUS_FAILED;
-                $run->error_message = $exception->getMessage();
+                $run->assignErrorMessage($exception->getMessage());
                 $run->finished_at = date('Y-m-d H:i:s');
-                $run->save(false);
+                $run->save(false, ['status', 'error_message', 'finished_at']);
             }
         } finally {
             $run = $this->findRun($runId);
@@ -203,7 +203,9 @@ class FabricImportRunService
     public function getStatusPayload(int $runId): array
     {
         $run = $this->findRun($runId);
+        $this->syncAwaitingConflictFromStats($run);
         $this->ensureRunCompleted($run);
+        $this->maybeRedispatchStalledWorker($run);
 
         if ($run->status === CatalogImportRun::STATUS_QUEUED) {
             $createdAt = strtotime((string)$run->created_at);
@@ -262,12 +264,53 @@ class FabricImportRunService
         if ($run->finished_at === null) {
             $run->finished_at = date('Y-m-d H:i:s');
         }
-        $run->save(false);
+        $run->save(false, ['status', 'phase', 'phase_message', 'finished_at']);
+    }
+
+    private function syncAwaitingConflictFromStats(CatalogImportRun $run): void
+    {
+        if ($run->status !== CatalogImportRun::STATUS_PROCESSING) {
+            return;
+        }
+
+        $payload = $run->getStats();
+        if (empty($payload['pending_conflict']) || !is_array($payload['pending_conflict'])) {
+            return;
+        }
+
+        $run->status = CatalogImportRun::STATUS_AWAITING_CONFLICT;
+        $run->phase_message = 'Конфликт: требуется решение в админке.';
+        $run->finished_at = null;
+        $run->save(false, ['status', 'phase_message', 'finished_at']);
     }
 
     public function dispatchWorker(int $runId): void
     {
         ImportRunWorkerLauncher::dispatch('fabric-import/run', $runId, 'fabric-import');
+    }
+
+    private function maybeRedispatchStalledWorker(CatalogImportRun $run): void
+    {
+        if ($run->status !== CatalogImportRun::STATUS_PROCESSING) {
+            return;
+        }
+
+        $lockPath = $this->lockPath((int)$run->id);
+        $lockHandle = @fopen($lockPath, 'c+');
+        if ($lockHandle === false) {
+            return;
+        }
+
+        if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            fclose($lockHandle);
+
+            return;
+        }
+
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+        @unlink($lockPath);
+        $this->dispatchWorker((int)$run->id);
     }
 
     private function findRun(int $runId): CatalogImportRun

@@ -65,11 +65,30 @@ class FabricCollectionController extends BaseController
     {
         if (!FabricLibraryArchiveUrls::exists()) {
             $build = FabricLibraryArchiveLauncher::rebuildNow();
-            if (!($build['success'] ?? false) && !FabricLibraryArchiveUrls::exists()) {
-                throw new ServerErrorHttpException(
-                    'Не удалось собрать PDF-каталог: '
-                    . ($build['message'] ?? 'файл не создан. На сервере выполните composer install в каталоге приложения.')
-                );
+            if (!FabricLibraryArchiveUrls::exists()) {
+                $fallbackPath = $build['path'] ?? null;
+                if (is_string($fallbackPath) && is_file($fallbackPath) && filesize($fallbackPath) > 0) {
+                    return Yii::$app->response->sendFile(
+                        $fallbackPath,
+                        basename(FabricLibraryArchiveUrls::relativePath()),
+                        [
+                            'mimeType' => FabricLibraryArchiveUrls::mimeType(),
+                            'inline' => false,
+                        ]
+                    );
+                }
+
+                $message = (string)($build['message'] ?? 'файл не создан.');
+                if (str_contains($message, 'уже выполняется')) {
+                    Yii::$app->session->setFlash(
+                        'warning',
+                        $message . ' Если сборка зависла, повторите скачивание через 1–2 минуты.'
+                    );
+
+                    return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS]);
+                }
+
+                throw new ServerErrorHttpException('Не удалось собрать архив фото: ' . $message);
             }
         }
 
@@ -77,7 +96,7 @@ class FabricCollectionController extends BaseController
             FabricLibraryArchiveUrls::absolutePath(),
             basename(FabricLibraryArchiveUrls::relativePath()),
             [
-                'mimeType' => 'application/pdf',
+                'mimeType' => FabricLibraryArchiveUrls::mimeType(),
                 'inline' => false,
             ]
         );
@@ -112,6 +131,8 @@ class FabricCollectionController extends BaseController
             $collectionFieldsNeedFullSync = $model->isAttributeChanged('is_active', false)
                 || $model->isAttributeChanged('price_category_id', false)
                 || $model->isAttributeChanged('price_category_line1_id', false);
+            $collectionArchiveLayoutChanged = $model->isAttributeChanged('texture', false)
+                || $model->isAttributeChanged('name', false);
             if (!$model->save()) {
                 return $this->render('form', array_merge($this->getFormViewParams($model), [
                     'model' => $model,
@@ -134,6 +155,10 @@ class FabricCollectionController extends BaseController
                     'model' => $model,
                     'title' => 'Редактирование коллекции',
                 ]));
+            }
+
+            if ($collectionArchiveLayoutChanged || $syncResult['needsPhotoArchiveRebuild']) {
+                FabricLibraryArchiveLauncher::dispatchRebuild();
             }
 
             Yii::$app->session->setFlash('success', 'Коллекция обновлена.');
@@ -297,9 +322,15 @@ class FabricCollectionController extends BaseController
     {
         Yii::$app->response->format = Response::FORMAT_JSON;
 
-        $service = new FabricImportRunService();
+        try {
+            $service = new FabricImportRunService();
 
-        return $service->getStatusPayload($id);
+            return $service->getStatusPayload($id);
+        } catch (\Throwable $e) {
+            Yii::$app->response->statusCode = 400;
+
+            return ['message' => $e->getMessage()];
+        }
     }
 
     public function actionImportResolve(): array
@@ -401,7 +432,7 @@ class FabricCollectionController extends BaseController
             return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS]);
         }
 
-        $result->importRun->setStats($result->toArray());
+        $result->importRun->setStats($result->toStatsPayload());
         $result->importRun->status = $result->success ? 'completed' : 'failed';
         $result->importRun->save(false);
 
@@ -502,7 +533,8 @@ class FabricCollectionController extends BaseController
      *     errors: string[],
      *     needsFullSync: bool,
      *     needsTitleRefresh: bool,
-     *     activeChangedColorIds: int[]
+     *     activeChangedColorIds: int[],
+     *     needsPhotoArchiveRebuild: bool
      * }
      */
     private function syncColorLinks(CatalogFabricCollection $collection, array $rows): array
@@ -519,6 +551,7 @@ class FabricCollectionController extends BaseController
         $needsFullSync = false;
         $needsTitleRefresh = false;
         $activeChangedColorIds = [];
+        $needsPhotoArchiveRebuild = false;
 
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -558,11 +591,20 @@ class FabricCollectionController extends BaseController
             $colorId = (int)($row['color_id'] ?? 0);
             $nextColorId = $colorId > 0 ? $colorId : null;
             $nextIsActive = (bool)($row['is_active'] ?? true);
+            $nextSwatchMediaId = $this->nullableInt($row['swatch_media_id'] ?? null);
             if ($isNewLink) {
                 $needsFullSync = true;
+                if ($nextSwatchMediaId !== null) {
+                    $needsPhotoArchiveRebuild = true;
+                }
             } else {
                 if ((int)$link->color_id !== (int)($nextColorId ?? 0) || (string)$link->design_code !== $designCode) {
                     $needsTitleRefresh = true;
+                }
+                if ((int)$link->swatch_media_id !== (int)($nextSwatchMediaId ?? 0)) {
+                    $needsPhotoArchiveRebuild = true;
+                } elseif ((string)$link->design_code !== $designCode) {
+                    $needsPhotoArchiveRebuild = true;
                 }
                 if ((bool)$link->is_active !== $nextIsActive) {
                     $activeChangedColorIds[] = (int)$link->id;
@@ -573,7 +615,7 @@ class FabricCollectionController extends BaseController
             $link->design_code = $designCode;
             $description = trim((string)($row['description'] ?? ''));
             $link->description = $description !== '' ? $description : null;
-            $link->swatch_media_id = $this->nullableInt($row['swatch_media_id'] ?? null);
+            $link->swatch_media_id = $nextSwatchMediaId;
             $link->sort_order = $sortOrder++;
             $link->is_active = $nextIsActive;
             $link->is_recommended_fabric = filter_var($row['is_recommended_fabric'] ?? false, FILTER_VALIDATE_BOOLEAN);
@@ -590,6 +632,9 @@ class FabricCollectionController extends BaseController
         foreach ($existing as $id => $link) {
             if (!in_array((int)$id, $keptIds, true)) {
                 $needsFullSync = true;
+                if ($link->swatch_media_id !== null) {
+                    $needsPhotoArchiveRebuild = true;
+                }
                 $link->delete();
             }
         }
@@ -599,6 +644,7 @@ class FabricCollectionController extends BaseController
             'needsFullSync' => $needsFullSync,
             'needsTitleRefresh' => $needsTitleRefresh,
             'activeChangedColorIds' => array_values(array_unique($activeChangedColorIds)),
+            'needsPhotoArchiveRebuild' => $needsPhotoArchiveRebuild,
         ];
     }
 

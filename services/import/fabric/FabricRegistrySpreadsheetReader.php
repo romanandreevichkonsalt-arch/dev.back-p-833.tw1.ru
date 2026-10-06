@@ -2,7 +2,9 @@
 
 namespace app\services\import\fabric;
 
+use app\services\import\SimpleXlsxSheetReader;
 use app\services\import\SpreadsheetFormatValidator;
+use app\services\import\SpreadsheetGridHelper;
 use app\services\import\SpreadsheetSheetResolver;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -36,6 +38,22 @@ class FabricRegistrySpreadsheetReader
     {
         SpreadsheetFormatValidator::assertReadableExcel($filePath);
 
+        if (class_exists(IOFactory::class)) {
+            try {
+                return $this->readViaPhpSpreadsheet($filePath);
+            } catch (\Throwable) {
+                // Битая установка PhpSpreadsheet или нестандартный файл — читаем .xlsx напрямую.
+            }
+        }
+
+        return $this->readViaSimpleXlsx($filePath);
+    }
+
+    /**
+     * @return FabricRegistryRowDto[]
+     */
+    private function readViaPhpSpreadsheet(string $filePath): array
+    {
         $spreadsheet = IOFactory::load($filePath);
         $sheet = SpreadsheetSheetResolver::findSheet($spreadsheet, [self::SHEET_FABRICS]);
         if ($sheet !== null) {
@@ -53,6 +71,93 @@ class FabricRegistrySpreadsheetReader
             self::SHEET_FABRICS,
             $spreadsheet,
             ['Ожидается лист «Ткани и кожа» (реестр v2) или листы «Коллекции» + «Цвета» (клиентский шаблон).'],
+        );
+    }
+
+    /**
+     * @return FabricRegistryRowDto[]
+     */
+    private function readViaSimpleXlsx(string $filePath): array
+    {
+        $reader = new SimpleXlsxSheetReader();
+        $sheetNames = $reader->listSheetNames($filePath);
+        $grids = $reader->readAllSheetsGrids($filePath);
+
+        $registryKey = SpreadsheetSheetResolver::normalizeName(self::SHEET_FABRICS);
+        if (isset($grids[$registryKey])) {
+            return $this->readRegistryGrid($grids[$registryKey]);
+        }
+
+        $collectionsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLLECTIONS);
+        $colorsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLORS);
+        if (isset($grids[$collectionsKey], $grids[$colorsKey])) {
+            return (new FabricClientSpreadsheetReader())->readFromGrids(
+                $grids[$collectionsKey],
+                $grids[$colorsKey]
+            );
+        }
+
+        throw SpreadsheetSheetResolver::sheetNotFoundExceptionFromNames(
+            self::SHEET_FABRICS,
+            $sheetNames,
+            ['Ожидается лист «Ткани и кожа» (реестр v2) или листы «Коллекции» + «Цвета» (клиентский шаблон).'],
+        );
+    }
+
+    /**
+     * @param array<int, array<string, string>> $grid
+     * @return FabricRegistryRowDto[]
+     */
+    private function readRegistryGrid(array $grid): array
+    {
+        $rows = [];
+        $highestRow = SpreadsheetGridHelper::highestDataRow($grid);
+
+        for ($rowNumber = self::DATA_START_ROW; $rowNumber <= $highestRow; $rowNumber++) {
+            $dto = $this->readRowFromGrid($grid, $rowNumber);
+            if ($dto === null) {
+                continue;
+            }
+
+            $rows[] = $dto;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int, array<string, string>> $grid
+     */
+    private function readRowFromGrid(array $grid, int $rowNumber): ?FabricRegistryRowDto
+    {
+        $collectionName = SpreadsheetGridHelper::cellValue($grid, self::COL_COLLECTION, $rowNumber);
+        $colorName = SpreadsheetGridHelper::cellValue($grid, self::COL_COLOR_NAME, $rowNumber);
+
+        if ($collectionName === '' && $colorName === '') {
+            return null;
+        }
+
+        $materialKind = SpreadsheetGridHelper::cellValue($grid, self::COL_MATERIAL_KIND, $rowNumber);
+
+        return new FabricRegistryRowDto(
+            rowNumber: $rowNumber,
+            materialKind: $this->normalizeMaterialKind($materialKind),
+            collectionName: $collectionName,
+            colorName: FabricDesignCodeNormalizer::fromRegistry($colorName),
+            composition: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_COMPOSITION, $rowNumber)),
+            priceCategoryLabelA: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_PRICE_CATEGORY_A, $rowNumber)),
+            priceCategoryLabelLine1: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_PRICE_CATEGORY_LINE1, $rowNumber)),
+            texture: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_TEXTURE, $rowNumber)),
+            colorLabel: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_COLOR, $rowNumber)),
+            martindale: $this->parseInt(SpreadsheetGridHelper::cellValue($grid, self::COL_MARTINDALE, $rowNumber)),
+            properties: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_PROPERTIES, $rowNumber)),
+            rollWidthCm: $this->parseInt(SpreadsheetGridHelper::cellValue($grid, self::COL_ROLL_WIDTH, $rowNumber)),
+            densityGsm: $this->parseInt(SpreadsheetGridHelper::cellValue($grid, self::COL_DENSITY, $rowNumber)),
+            textureUrl: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_TEXTURE_URL, $rowNumber)),
+            isRecommendedFabric: $this->parseBoolean(SpreadsheetGridHelper::cellValue($grid, self::COL_IS_RECOMMENDED_FABRIC, $rowNumber)),
+            positionNumber: $this->parseInt(SpreadsheetGridHelper::cellValue($grid, self::COL_POSITION_NUMBER, $rowNumber)),
+            description: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_DESCRIPTION, $rowNumber)),
+            importComment: $this->nullableString(SpreadsheetGridHelper::cellValue($grid, self::COL_COMMENT, $rowNumber)),
         );
     }
 

@@ -81,7 +81,9 @@ use yii\widgets\ActiveForm;
                 'type' => 'button',
                 'data-fabric-import-submit' => true,
             ]) ?>
-            <?= Html::a('Скачать каталог (PDF)', ['download-textures-archive'], [
+        </div>
+        <div class="admin-fabric-import__download">
+            <?= Html::a('Скачать архив фото', ['download-textures-archive'], [
                 'class' => 'admin-btn admin-btn--secondary',
                 'data-fabric-textures-archive-download' => '1',
             ]) ?>

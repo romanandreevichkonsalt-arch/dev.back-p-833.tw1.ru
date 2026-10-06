@@ -2,6 +2,7 @@
 
 namespace app\services\import\fabric;
 
+use app\services\import\SpreadsheetGridHelper;
 use app\services\import\SpreadsheetSheetResolver;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -67,6 +68,52 @@ class FabricClientSpreadsheetReader
     }
 
     /**
+     * @param array<int, array<string, string>> $collectionsGrid
+     * @param array<int, array<string, string>> $colorsGrid
+     * @return FabricRegistryRowDto[]
+     */
+    public function readFromGrids(array $collectionsGrid, array $colorsGrid): array
+    {
+        $collections = $this->readCollectionsFromGrid($collectionsGrid);
+        $rows = [];
+        $highestRow = SpreadsheetGridHelper::highestDataRow($colorsGrid);
+
+        for ($rowNumber = self::DATA_START_ROW; $rowNumber <= $highestRow; $rowNumber++) {
+            $collectionName = SpreadsheetGridHelper::cellValue($colorsGrid, 'A', $rowNumber);
+            $colorName = SpreadsheetGridHelper::cellValue($colorsGrid, 'B', $rowNumber);
+            if ($collectionName === '' && $colorName === '') {
+                continue;
+            }
+
+            $collectionKey = SpreadsheetSheetResolver::normalizeName($collectionName);
+            $collection = $collections[$collectionKey] ?? null;
+
+            $rows[] = new FabricRegistryRowDto(
+                rowNumber: $rowNumber,
+                materialKind: $collection['materialKind'] ?? \app\models\CatalogFabricCollection::MATERIAL_KIND_FABRIC,
+                collectionName: $collectionName,
+                colorName: FabricDesignCodeNormalizer::fromRegistry($colorName),
+                composition: $collection['composition'] ?? null,
+                priceCategoryLabelA: $collection['priceCategoryLabelA'] ?? null,
+                priceCategoryLabelLine1: $collection['priceCategoryLabelLine1'] ?? null,
+                texture: $collection['texture'] ?? null,
+                colorLabel: $this->nullableString(SpreadsheetGridHelper::cellValue($colorsGrid, 'C', $rowNumber)),
+                martindale: $collection['martindale'] ?? null,
+                properties: $collection['properties'] ?? null,
+                rollWidthCm: $collection['rollWidthCm'] ?? null,
+                densityGsm: $collection['densityGsm'] ?? null,
+                textureUrl: $this->nullableString(SpreadsheetGridHelper::cellValue($colorsGrid, 'D', $rowNumber)),
+                isRecommendedFabric: false,
+                positionNumber: null,
+                description: $collection['description'] ?? null,
+                importComment: $this->nullableString(SpreadsheetGridHelper::cellValue($colorsGrid, 'E', $rowNumber)),
+            );
+        }
+
+        return $rows;
+    }
+
+    /**
      * @return array<string, array<string, mixed>>
      */
     private function readCollections(Worksheet $sheet): array
@@ -91,6 +138,38 @@ class FabricClientSpreadsheetReader
                 'description' => $this->nullableString($this->cellValue($sheet, 'I', $rowNumber)),
                 'priceCategoryLabelA' => $this->nullableString($this->cellValue($sheet, 'J', $rowNumber)),
                 'priceCategoryLabelLine1' => $this->nullableString($this->cellValue($sheet, 'K', $rowNumber)),
+            ];
+        }
+
+        return $collections;
+    }
+
+    /**
+     * @param array<int, array<string, string>> $grid
+     * @return array<string, array<string, mixed>>
+     */
+    private function readCollectionsFromGrid(array $grid): array
+    {
+        $collections = [];
+        $highestRow = SpreadsheetGridHelper::highestDataRow($grid);
+
+        for ($rowNumber = self::DATA_START_ROW; $rowNumber <= $highestRow; $rowNumber++) {
+            $collectionName = SpreadsheetGridHelper::cellValue($grid, 'B', $rowNumber);
+            if ($collectionName === '') {
+                continue;
+            }
+
+            $collections[SpreadsheetSheetResolver::normalizeName($collectionName)] = [
+                'materialKind' => $this->normalizeMaterialKind(SpreadsheetGridHelper::cellValue($grid, 'A', $rowNumber)),
+                'composition' => $this->nullableString(SpreadsheetGridHelper::cellValue($grid, 'C', $rowNumber)),
+                'texture' => $this->nullableString(SpreadsheetGridHelper::cellValue($grid, 'D', $rowNumber)),
+                'martindale' => $this->parseInt(SpreadsheetGridHelper::cellValue($grid, 'E', $rowNumber)),
+                'properties' => $this->nullableString(SpreadsheetGridHelper::cellValue($grid, 'F', $rowNumber)),
+                'rollWidthCm' => $this->parseInt(SpreadsheetGridHelper::cellValue($grid, 'G', $rowNumber)),
+                'densityGsm' => $this->parseInt(SpreadsheetGridHelper::cellValue($grid, 'H', $rowNumber)),
+                'description' => $this->nullableString(SpreadsheetGridHelper::cellValue($grid, 'I', $rowNumber)),
+                'priceCategoryLabelA' => $this->nullableString(SpreadsheetGridHelper::cellValue($grid, 'J', $rowNumber)),
+                'priceCategoryLabelLine1' => $this->nullableString(SpreadsheetGridHelper::cellValue($grid, 'K', $rowNumber)),
             ];
         }
 

@@ -71,6 +71,30 @@ class SpreadsheetSheetResolver
         return new \InvalidArgumentException($message);
     }
 
+    /**
+     * @param list<string> $availableSheetNames
+     * @param list<string> $hints
+     */
+    public static function sheetNotFoundExceptionFromNames(
+        string $expectedLabel,
+        array $availableSheetNames,
+        array $hints = []
+    ): \InvalidArgumentException {
+        $available = array_map(
+            static fn (string $name): string => '«' . $name . '»',
+            $availableSheetNames
+        );
+        $message = 'Лист «' . $expectedLabel . '» не найден в файле.';
+        if ($available !== []) {
+            $message .= ' Найдены листы: ' . implode(', ', $available) . '.';
+        }
+        if ($hints !== []) {
+            $message .= ' ' . implode(' ', $hints);
+        }
+
+        return new \InvalidArgumentException($message);
+    }
+
     public static function normalizeName(string $name): string
     {
         $name = str_replace("\xc2\xa0", ' ', $name);

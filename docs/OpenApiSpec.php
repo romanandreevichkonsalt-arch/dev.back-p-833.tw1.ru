@@ -26,7 +26,7 @@ use OpenApi\Annotations as OA;
  *
  * @OA\Tag(
  *     name="Каталог",
- *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — ткани для страницы библиотеки (рекомендуемые по position_number, затем по алфавиту). GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
+ *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — ткани для страницы библиотеки (рекомендуемые по position_number, затем по алфавиту); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
  * )
  *
  * @OA\Tag(
@@ -1983,8 +1983,8 @@ use OpenApi\Annotations as OA;
  *             property="texturesArchiveUrl",
  *             type="string",
  *             nullable=true,
- *             example="/files/library-fabrics.pdf",
- *             description="Ссылка на PDF-каталог коллекций и цветов с фото (если собран после импорта)"
+ *             example="https://dev.back-p-833.tw1.ru/files/library-fabrics.zip",
+ *             description="Абсолютный URL готового ZIP с фото образцов (структура: фактура/коллекция/design_code.ext). Поле есть только если файл archives собран на сервере; пересборка — админка «Ткани», импорт реестра, изменение фото."
  *         )
  *     )
  * )

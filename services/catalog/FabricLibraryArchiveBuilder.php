@@ -9,7 +9,7 @@ use yii\helpers\FileHelper;
 class FabricLibraryArchiveBuilder
 {
     public function __construct(
-        private readonly FabricLibraryPdfRenderer $pdfRenderer = new FabricLibraryPdfRenderer(),
+        private readonly FabricLibraryPhotoZipBuilder $photoZipBuilder = new FabricLibraryPhotoZipBuilder(),
     ) {
     }
 
@@ -27,24 +27,19 @@ class FabricLibraryArchiveBuilder
         FileHelper::createDirectory(dirname($targetPath));
 
         $lockPath = Yii::getAlias('@runtime/fabric-library-archive/build.lock');
-        FileHelper::createDirectory(dirname($lockPath));
-        $lockHandle = fopen($lockPath, 'c+');
-        if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
-            if ($lockHandle !== false) {
-                fclose($lockHandle);
-            }
-
+        $lockHandle = $this->acquireBuildLock($lockPath);
+        if ($lockHandle === null) {
             return [
                 'success' => false,
                 'path' => is_file($targetPath) ? $targetPath : null,
                 'publicUrl' => is_file($targetPath) ? FabricLibraryArchiveUrls::publicUrl() : null,
-                'message' => 'Сборка каталога уже выполняется.',
+                'message' => 'Сборка архива уже выполняется. Подождите минуту и обновите страницу.',
                 'fileCount' => 0,
             ];
         }
 
         try {
-            @ini_set('memory_limit', '768M');
+            @ini_set('memory_limit', '512M');
             @set_time_limit(0);
 
             if (is_file($tempPath)) {
@@ -52,26 +47,25 @@ class FabricLibraryArchiveBuilder
             }
 
             $collections = $this->loadActiveCollections();
-            $this->pdfRenderer->renderToFile($tempPath, $collections);
+            $buildResult = $this->photoZipBuilder->buildZip($tempPath, $collections);
 
             if (is_file($targetPath)) {
                 @unlink($targetPath);
             }
             if (!rename($tempPath, $targetPath)) {
-                throw new \RuntimeException('Не удалось опубликовать PDF-каталог.');
-            }
-
-            $colorCount = 0;
-            foreach ($collections as $collection) {
-                $colorCount += count($collection->activeColors);
+                throw new \RuntimeException('Не удалось опубликовать архив фото тканей.');
             }
 
             return [
                 'success' => true,
                 'path' => $targetPath,
                 'publicUrl' => FabricLibraryArchiveUrls::publicUrl(),
-                'message' => 'PDF-каталог обновлён.',
-                'fileCount' => $colorCount,
+                'message' => sprintf(
+                    'Архив фото тканей обновлён (%d файлов%s).',
+                    $buildResult['fileCount'],
+                    $buildResult['skipped'] > 0 ? ', пропущено без фото: ' . $buildResult['skipped'] : ''
+                ),
+                'fileCount' => $buildResult['fileCount'],
             ];
         } catch (\Throwable $exception) {
             Yii::error($exception->getMessage(), __METHOD__);
@@ -89,6 +83,64 @@ class FabricLibraryArchiveBuilder
         } finally {
             flock($lockHandle, LOCK_UN);
             fclose($lockHandle);
+            @unlink($lockPath);
+        }
+    }
+
+    /**
+     * @return resource|null
+     */
+    private function acquireBuildLock(string $lockPath)
+    {
+        FileHelper::createDirectory(dirname($lockPath));
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            if ($attempt > 0) {
+                $this->clearStaleBuildLock($lockPath);
+                usleep($attempt === 1 ? 300_000 : 800_000);
+            }
+
+            $lockHandle = fopen($lockPath, 'c+');
+            if ($lockHandle === false) {
+                continue;
+            }
+
+            if (flock($lockHandle, LOCK_EX | LOCK_NB)) {
+                return $lockHandle;
+            }
+
+            fclose($lockHandle);
+        }
+
+        return null;
+    }
+
+    private function clearStaleBuildLock(string $lockPath): void
+    {
+        if (!is_file($lockPath)) {
+            return;
+        }
+
+        $lockHandle = @fopen($lockPath, 'c+');
+        if ($lockHandle === false) {
+            @unlink($lockPath);
+
+            return;
+        }
+
+        if (flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+            @unlink($lockPath);
+
+            return;
+        }
+
+        fclose($lockHandle);
+
+        $mtime = filemtime($lockPath);
+        if ($mtime !== false && time() - $mtime >= 120) {
+            @unlink($lockPath);
         }
     }
 
@@ -103,7 +155,7 @@ class FabricLibraryArchiveBuilder
                 'activeColors.catalogColor',
                 'activeColors.swatchMedia',
             ])
-            ->orderBy(['name' => SORT_ASC, 'id' => SORT_ASC])
+            ->orderBy(['texture' => SORT_ASC, 'name' => SORT_ASC, 'id' => SORT_ASC])
             ->all();
     }
 
@@ -117,9 +169,9 @@ class FabricLibraryArchiveBuilder
             $config = [];
         }
 
-        $relativePath = trim((string)($config['relativePath'] ?? 'files/library-fabrics.pdf'));
+        $relativePath = trim((string)($config['relativePath'] ?? 'files/library-fabrics.zip'));
         if ($relativePath === '') {
-            $relativePath = 'files/library-fabrics.pdf';
+            $relativePath = 'files/library-fabrics.zip';
         }
 
         return ['relativePath' => $relativePath];

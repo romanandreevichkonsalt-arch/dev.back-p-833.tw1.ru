@@ -54,4 +54,17 @@ class FabricRegistryImportResult
             'import_run_id' => $this->importRun?->id,
         ];
     }
+
+    /**
+     * Сериализация для catalog_import_runs.stats_json (без построчного отчёта — иначе >64 KB).
+     *
+     * @return array<string, mixed>
+     */
+    public function toStatsPayload(): array
+    {
+        $payload = $this->toArray();
+        unset($payload['rows']);
+
+        return $payload;
+    }
 }

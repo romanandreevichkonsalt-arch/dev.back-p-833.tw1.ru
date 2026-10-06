@@ -19,18 +19,23 @@ class SpreadsheetFormatValidator
             throw new \InvalidArgumentException('Файл пустой. Повторите загрузку .xlsx.');
         }
 
-        try {
-            $type = IOFactory::identify($filePath);
-        } catch (\Throwable $e) {
-            throw new \InvalidArgumentException(
-                'Не удалось прочитать Excel-файл. Убедитесь, что загружаете .xlsx, а не HTML или другой формат.'
-            );
+        if (class_exists(IOFactory::class)) {
+            try {
+                $type = IOFactory::identify($filePath);
+                if (!in_array($type, ['Xlsx', 'Xls', 'Ods'], true)) {
+                    throw new \InvalidArgumentException(
+                        'Неверный формат файла (' . $type . '). Загрузите настоящий Excel (.xlsx).'
+                    );
+                }
+
+                return;
+            } catch (\InvalidArgumentException $e) {
+                throw $e;
+            } catch (\Throwable) {
+                // PhpSpreadsheet недоступен или файл не распознан — пробуем .xlsx через ZIP ниже.
+            }
         }
 
-        if (!in_array($type, ['Xlsx', 'Xls', 'Ods'], true)) {
-            throw new \InvalidArgumentException(
-                'Неверный формат файла (' . $type . '). Загрузите настоящий Excel (.xlsx).'
-            );
-        }
+        SimpleXlsxSheetReader::assertZipXlsx($filePath);
     }
 }
