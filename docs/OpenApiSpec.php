@@ -423,6 +423,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="texture", type="string", nullable=true, example="ткань · фактура", title="фактура", description="фактура коллекции ткани (catalog_fabric_collections.texture)"),
  *     @OA\Property(property="isRecommendedFabric", type="boolean", description="Реком. ткань из реестра (колонка O)"),
  *     @OA\Property(property="positionNumber", type="integer", nullable=true, description="№ позиции в коллекции (колонка P)"),
+ *     @OA\Property(property="description", type="string", nullable=true, description="Описание цветодизайна для карточки товара"),
  *     @OA\Property(
  *         property="swatches",
  *         type="array",
@@ -1962,6 +1963,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="martindale", type="integer", nullable=true, description="Износостойкость, циклы Мартиндейла (из коллекции)"),
  *     @OA\Property(property="isRecommendedFabric", type="boolean"),
  *     @OA\Property(property="positionNumber", type="integer", nullable=true, description="Порядок среди рекомендуемых"),
+ *     @OA\Property(property="description", type="string", nullable=true, description="Описание цветодизайна"),
  *     @OA\Property(property="swatch", ref="#/components/schemas/CatalogImage", nullable=true)
  * )
  *

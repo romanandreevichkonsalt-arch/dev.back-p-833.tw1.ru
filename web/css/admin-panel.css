@@ -2503,6 +2503,10 @@ body.admin-modal-open {
     display: none;
 }
 
+.admin-fabric-colors__description-store {
+    display: none !important;
+}
+
 .admin-input--narrow {
     max-width: 120px;
 }

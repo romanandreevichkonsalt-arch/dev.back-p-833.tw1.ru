@@ -63,6 +63,7 @@
         var editId = modal.querySelector('[data-fabric-color-edit-id]');
         var codeInput = modal.querySelector('[data-fabric-color-design-code]');
         var colorSelect = modal.querySelector('[data-fabric-color-catalog-color]');
+        var descriptionInput = modal.querySelector('[data-fabric-color-description]');
 
         if (row) {
             if (title) title.textContent = 'Редактировать цвет';
@@ -70,6 +71,10 @@
             if (editId) editId.value = row.getAttribute('data-link-id') || '';
             if (codeInput) codeInput.value = row.getAttribute('data-design-code') || '';
             if (colorSelect) colorSelect.value = row.getAttribute('data-color-id') || '';
+            if (descriptionInput) {
+                var storedDescription = row.querySelector('[name*="[description]"]');
+                descriptionInput.value = storedDescription ? storedDescription.value : '';
+            }
             setPickerValue(modal, row.getAttribute('data-swatch-media-id') || '', row.getAttribute('data-swatch-url') || '');
         } else {
             if (title) title.textContent = 'Добавить цвет';
@@ -77,6 +82,7 @@
             if (editId) editId.value = '';
             if (codeInput) codeInput.value = '';
             if (colorSelect) colorSelect.value = '';
+            if (descriptionInput) descriptionInput.value = '';
             setPickerValue(modal, '', '');
         }
 
@@ -134,6 +140,11 @@
         newRow.setAttribute('data-swatch-media-id', payload.swatchMediaId || '');
         newRow.setAttribute('data-swatch-url', payload.swatchPreviewUrl || '');
         newRow.setAttribute('data-link-id', payload.linkId || '');
+
+        var descriptionField = newRow.querySelector('[name*="[description]"]');
+        if (descriptionField) {
+            descriptionField.value = payload.description || '';
+        }
 
         if (existing) {
             existing.replaceWith(newRow);
@@ -215,6 +226,7 @@
                 var editRow = rowKey ? tbody?.querySelector('[data-row-key="' + rowKey + '"]') : null;
                 var recommendedCheckbox = editRow?.querySelector('[name*="[is_recommended_fabric]"][type="checkbox"]');
                 var positionInput = editRow?.querySelector('[name*="[position_number]"]');
+                var description = modal.querySelector('[data-fabric-color-description]')?.value || '';
 
                 upsertRow(section, {
                     rowKey: rowKey,
@@ -223,6 +235,7 @@
                     colorId: colorId,
                     swatchMediaId: swatchMediaId,
                     swatchPreviewUrl: swatchPreviewUrl,
+                    description: description,
                     isRecommendedFabric: recommendedCheckbox ? recommendedCheckbox.checked : false,
                     positionNumber: positionInput ? positionInput.value : '',
                 });

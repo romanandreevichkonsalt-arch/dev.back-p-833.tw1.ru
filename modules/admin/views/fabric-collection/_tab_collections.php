@@ -111,6 +111,41 @@ use yii\widgets\ActiveForm;
     </div>
 </div>
 
+<div class="admin-card admin-card--full admin-fabric-import" id="fabric-color-descriptions-import">
+    <div class="admin-fabric-import__head">
+        <h2 class="admin-form-section-title">Импорт описаний цветодизайнов</h2>
+        <p class="admin-muted">
+            Отдельный файл Excel: колонки «Название ткани», «Нумерация оттенка ткани», «Название цвета и описание».
+            Сопоставление по коллекции ткани и коду цвета в каталоге.
+        </p>
+    </div>
+
+    <?php $descriptionsImportForm = ActiveForm::begin([
+        'action' => ['import-color-descriptions', 'tab' => FabricCollectionController::TAB_COLLECTIONS],
+        'options' => [
+            'enctype' => 'multipart/form-data',
+            'class' => 'admin-form admin-fabric-import__form',
+        ],
+    ]); ?>
+    <div class="admin-fabric-import__row">
+        <div class="form-group">
+            <label class="form-label" for="color-descriptions-file">Файл .xlsx</label>
+            <input type="file" id="color-descriptions-file" name="color_descriptions_file" class="form-control" accept=".xlsx,.xls" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="color-descriptions-overwrite">Если описание уже есть</label>
+            <select id="color-descriptions-overwrite" name="overwrite_existing" class="form-control">
+                <option value="1" selected>Заменять существующие</option>
+                <option value="0">Не перезаписывать</option>
+            </select>
+        </div>
+        <div class="admin-fabric-import__actions">
+            <?= Html::submitButton('Импортировать описания', ['class' => 'admin-btn']) ?>
+        </div>
+    </div>
+    <?php ActiveForm::end(); ?>
+</div>
+
 <div class="admin-card">
     <table class="admin-table">
         <thead>

@@ -12,6 +12,7 @@ use app\services\catalog\FabricLibraryArchiveUrls;
 use app\services\cache\ApiCacheInvalidator;
 use app\services\import\SpreadsheetFormatValidator;
 use app\services\import\fabric\FabricDesignCodeNormalizer;
+use app\services\import\fabric\FabricColorDescriptionImporter;
 use app\services\import\fabric\FabricImportRunService;
 use app\services\import\fabric\FabricRegistryImportOptions;
 use app\services\import\fabric\FabricRegistryImporter;
@@ -106,10 +107,26 @@ class FabricCollectionController extends BaseController
     {
         $model = $this->findModel($id);
 
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
-            $errors = $this->syncColorLinks($model, (array)Yii::$app->request->post('fabric_color_links', []));
-            Yii::$container->get(CatalogModelProductSyncService::class)
-                ->syncForFabricCollectionId((int)$model->id);
+        if ($model->load(Yii::$app->request->post())) {
+            $collectionNameBeforeSave = trim((string)$model->getOldAttribute('name'));
+            $collectionFieldsNeedFullSync = $model->isAttributeChanged('is_active', false)
+                || $model->isAttributeChanged('price_category_id', false)
+                || $model->isAttributeChanged('price_category_line1_id', false);
+            if (!$model->save()) {
+                return $this->render('form', array_merge($this->getFormViewParams($model), [
+                    'model' => $model,
+                    'title' => 'Редактирование коллекции',
+                ]));
+            }
+
+            $syncResult = $this->syncColorLinks($model, (array)Yii::$app->request->post('fabric_color_links', []));
+            $errors = $syncResult['errors'];
+            $this->applyFabricCollectionProductSyncAfterSave(
+                $model,
+                $syncResult,
+                $collectionNameBeforeSave !== trim((string)$model->name),
+                $collectionFieldsNeedFullSync
+            );
 
             if ($errors !== []) {
                 Yii::$app->session->setFlash('error', implode(' ', $errors));
@@ -198,6 +215,50 @@ class FabricCollectionController extends BaseController
         Yii::$app->session->setFlash('success', $saved > 0 ? 'Категории ткани обновлены.' : 'Нет изменений.');
 
         return $this->redirect(['index', 'tab' => self::TAB_CATEGORIES]);
+    }
+
+    public function actionImportColorDescriptions(): Response
+    {
+        $uploadedFile = UploadedFile::getInstanceByName('color_descriptions_file');
+        if ($uploadedFile === null) {
+            Yii::$app->session->setFlash('error', 'Выберите файл с описаниями цветодизайнов (.xlsx).');
+
+            return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS, '#' => 'fabric-color-descriptions-import']);
+        }
+
+        $extension = strtolower((string)$uploadedFile->extension);
+        if ($extension !== 'xlsx') {
+            Yii::$app->session->setFlash('error', 'Для импорта описаний нужен файл .xlsx.');
+
+            return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS, '#' => 'fabric-color-descriptions-import']);
+        }
+
+        $importDir = Yii::getAlias('@runtime/fabric-import');
+        \yii\helpers\FileHelper::createDirectory($importDir);
+        $storedPath = $importDir . '/' . uniqid('color_descriptions_', true) . '.xlsx';
+        if (!$uploadedFile->saveAs($storedPath)) {
+            Yii::$app->session->setFlash('error', 'Не удалось сохранить загруженный файл.');
+
+            return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS, '#' => 'fabric-color-descriptions-import']);
+        }
+
+        try {
+            $overwriteExisting = (string)Yii::$app->request->post('overwrite_existing', '1') === '1';
+            $result = (new FabricColorDescriptionImporter())->importFromFile($storedPath, $overwriteExisting);
+            ApiCacheInvalidator::touch();
+
+            $flashType = $result->updated > 0 ? 'success' : 'warning';
+            Yii::$app->session->setFlash($flashType, $result->buildSummary());
+            if ($result->messages !== []) {
+                Yii::$app->session->setFlash('info', implode("\n", $result->messages));
+            }
+        } catch (\Throwable $e) {
+            Yii::$app->session->setFlash('error', 'Ошибка импорта описаний: ' . $e->getMessage());
+        } finally {
+            @unlink($storedPath);
+        }
+
+        return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS, '#' => 'fabric-color-descriptions-import']);
     }
 
     public function actionImportStart(): array
@@ -437,7 +498,12 @@ class FabricCollectionController extends BaseController
 
     /**
      * @param array<int|string, array<string, mixed>> $rows
-     * @return string[]
+     * @return array{
+     *     errors: string[],
+     *     needsFullSync: bool,
+     *     needsTitleRefresh: bool,
+     *     activeChangedColorIds: int[]
+     * }
      */
     private function syncColorLinks(CatalogFabricCollection $collection, array $rows): array
     {
@@ -450,6 +516,9 @@ class FabricCollectionController extends BaseController
         $sortOrder = 0;
         $errors = [];
         $usedCodes = [];
+        $needsFullSync = false;
+        $needsTitleRefresh = false;
+        $activeChangedColorIds = [];
 
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -468,9 +537,10 @@ class FabricCollectionController extends BaseController
             $usedCodes[$designCode] = true;
 
             $linkId = (int)($row['id'] ?? 0);
-            $link = ($linkId > 0 && isset($existing[$linkId]))
-                ? $existing[$linkId]
-                : new CatalogFabricColor(['fabric_collection_id' => (int)$collection->id]);
+            $isNewLink = !($linkId > 0 && isset($existing[$linkId]));
+            $link = $isNewLink
+                ? new CatalogFabricColor(['fabric_collection_id' => (int)$collection->id])
+                : $existing[$linkId];
 
             $duplicate = CatalogFabricColor::find()
                 ->where([
@@ -486,11 +556,26 @@ class FabricCollectionController extends BaseController
             }
 
             $colorId = (int)($row['color_id'] ?? 0);
-            $link->color_id = $colorId > 0 ? $colorId : null;
+            $nextColorId = $colorId > 0 ? $colorId : null;
+            $nextIsActive = (bool)($row['is_active'] ?? true);
+            if ($isNewLink) {
+                $needsFullSync = true;
+            } else {
+                if ((int)$link->color_id !== (int)($nextColorId ?? 0) || (string)$link->design_code !== $designCode) {
+                    $needsTitleRefresh = true;
+                }
+                if ((bool)$link->is_active !== $nextIsActive) {
+                    $activeChangedColorIds[] = (int)$link->id;
+                }
+            }
+
+            $link->color_id = $nextColorId;
             $link->design_code = $designCode;
+            $description = trim((string)($row['description'] ?? ''));
+            $link->description = $description !== '' ? $description : null;
             $link->swatch_media_id = $this->nullableInt($row['swatch_media_id'] ?? null);
             $link->sort_order = $sortOrder++;
-            $link->is_active = (bool)($row['is_active'] ?? true);
+            $link->is_active = $nextIsActive;
             $link->is_recommended_fabric = filter_var($row['is_recommended_fabric'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $link->position_number = $this->nullableInt($row['position_number'] ?? null);
 
@@ -504,11 +589,49 @@ class FabricCollectionController extends BaseController
 
         foreach ($existing as $id => $link) {
             if (!in_array((int)$id, $keptIds, true)) {
+                $needsFullSync = true;
                 $link->delete();
             }
         }
 
-        return $errors;
+        return [
+            'errors' => $errors,
+            'needsFullSync' => $needsFullSync,
+            'needsTitleRefresh' => $needsTitleRefresh,
+            'activeChangedColorIds' => array_values(array_unique($activeChangedColorIds)),
+        ];
+    }
+
+    /**
+     * @param array{
+     *     errors: string[],
+     *     needsFullSync: bool,
+     *     needsTitleRefresh: bool,
+     *     activeChangedColorIds: int[]
+     * } $syncResult
+     */
+    private function applyFabricCollectionProductSyncAfterSave(
+        CatalogFabricCollection $collection,
+        array $syncResult,
+        bool $collectionNameChanged,
+        bool $collectionFieldsNeedFullSync
+    ): void {
+        $syncService = Yii::$container->get(CatalogModelProductSyncService::class);
+        $collectionId = (int)$collection->id;
+
+        if ($syncResult['needsFullSync'] || $collectionFieldsNeedFullSync) {
+            $syncService->syncForFabricCollectionId($collectionId);
+
+            return;
+        }
+
+        if ($syncResult['activeChangedColorIds'] !== []) {
+            $syncService->refreshFabricProductActiveForFabricColorIds($syncResult['activeChangedColorIds']);
+        }
+
+        if ($syncResult['needsTitleRefresh'] || $collectionNameChanged) {
+            $syncService->refreshDerivedNamesForFabricCollectionId($collectionId);
+        }
     }
 
     private function nullableInt(mixed $value): ?int

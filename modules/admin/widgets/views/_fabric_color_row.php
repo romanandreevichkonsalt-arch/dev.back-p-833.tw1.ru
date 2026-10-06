@@ -29,6 +29,12 @@ $swatchHtml = $link->getSwatchPreviewUrl() !== null
         <input type="hidden" name="fabric_color_links[<?= Html::encode($rowKey) ?>][design_code]" value="<?= Html::encode($link->design_code) ?>">
         <input type="hidden" name="fabric_color_links[<?= Html::encode($rowKey) ?>][color_id]" value="<?= $link->color_id !== null ? (int)$link->color_id : '' ?>">
         <input type="hidden" name="fabric_color_links[<?= Html::encode($rowKey) ?>][swatch_media_id]" value="<?= $link->swatch_media_id !== null ? (int)$link->swatch_media_id : '' ?>">
+        <textarea
+            name="fabric_color_links[<?= Html::encode($rowKey) ?>][description]"
+            class="admin-fabric-colors__description-store"
+            aria-hidden="true"
+            tabindex="-1"
+        ><?= Html::encode((string)($link->description ?? '')) ?></textarea>
         <input type="hidden" name="fabric_color_links[<?= Html::encode($rowKey) ?>][is_active]" value="1">
     </td>
     <td data-fabric-color-display-label><?= Html::encode($colorLabel) ?></td>

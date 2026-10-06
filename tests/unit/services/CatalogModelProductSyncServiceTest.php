@@ -187,6 +187,76 @@ class CatalogModelProductSyncServiceTest extends Unit
         verify((bool)$product->is_active)->false();
     }
 
+    public function testRefreshDerivedNamesUpdatesProductTitleWhenFabricCollectionRenamed(): void
+    {
+        $direction = $this->createDirection('sync-test-direction-rename-fabric');
+        $collection = $this->createCatalogCollection($direction, 'sync-test-collection-rename-fabric');
+        $category = $this->createCategory('sync-test-category-rename-fabric');
+        $sub = $this->createSubcategory($category, 'sync-test-sub-rename-fabric');
+        $fabric = $this->createFabricCollection('fabric-old-name');
+        $color = $this->createFabricColorLink($fabric, 'gray', 'Серый');
+
+        $model = new CatalogModel([
+            'collection_id' => $collection->id,
+            'category_id' => $category->id,
+            'subcategory_id' => $sub->id,
+            'slug' => 'sync-test-model-rename-fabric',
+            'title' => 'Модель rename fabric',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+        $model->save(false);
+        $model->syncFabricCollectionLinks([$fabric->id]);
+        $this->syncService->syncForModel($model);
+
+        $product = CatalogProduct::find()->where(['fabric_color_id' => $color->id])->one();
+        verify($product)->notNull();
+        verify($product->title)->stringContainsString('fabric-old-name');
+
+        $fabric->name = 'Velvet New';
+        $fabric->save(false);
+        verify($this->syncService->refreshDerivedNamesForFabricCollectionId((int)$fabric->id))->equals(1);
+
+        $product->refresh();
+        verify($product->title)->equals('sync-test-sub-rename-fabric sync-test-collection-rename-fabric Серый Velvet New gray');
+        verify($product->slug)->equals('sync-test-sub-rename-fabric-sync-test-collection-rename-fabric-seryy-velvet-new-gray');
+    }
+
+    public function testRefreshDerivedNamesUpdatesProductWhenCatalogColorLabelChanges(): void
+    {
+        $direction = $this->createDirection('sync-test-direction-rename-color');
+        $collection = $this->createCatalogCollection($direction, 'sync-test-collection-rename-color');
+        $category = $this->createCategory('sync-test-category-rename-color');
+        $sub = $this->createSubcategory($category, 'sync-test-sub-rename-color');
+        $fabric = $this->createFabricCollection('fabric-rename-color');
+        $color = $this->createFabricColorLink($fabric, 'gray', 'Серый');
+
+        $model = new CatalogModel([
+            'collection_id' => $collection->id,
+            'category_id' => $category->id,
+            'subcategory_id' => $sub->id,
+            'slug' => 'sync-test-model-rename-color',
+            'title' => 'Модель rename color',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+        $model->save(false);
+        $model->syncFabricCollectionLinks([$fabric->id]);
+        $this->syncService->syncForModel($model);
+
+        $product = CatalogProduct::find()->where(['fabric_color_id' => $color->id])->one();
+        verify($product)->notNull();
+
+        $catalogColor = CatalogColor::findOne((int)$color->color_id);
+        verify($catalogColor)->notNull();
+        $catalogColor->label = 'Графит';
+        $catalogColor->save(false);
+
+        $product->refresh();
+        verify($product->title)->stringContainsString('Графит');
+        verify($product->title)->stringNotContainsString('Серый');
+    }
+
     public function testRemovesProductsWhenFabricUnlinked(): void
     {
         $direction = $this->createDirection('sync-test-direction-2');

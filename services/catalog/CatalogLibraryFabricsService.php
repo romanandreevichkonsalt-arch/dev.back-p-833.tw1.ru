@@ -176,6 +176,7 @@ class CatalogLibraryFabricsService
             'martindale' => $martindale,
             'isRecommendedFabric' => (bool)$fabric->is_recommended_fabric,
             'positionNumber' => $fabric->position_number !== null ? (int)$fabric->position_number : null,
+            'description' => $fabric->getDescriptionForApi(),
             'swatch' => $swatches[0] ?? null,
         ];
     }

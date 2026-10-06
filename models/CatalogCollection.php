@@ -152,4 +152,20 @@ class CatalogCollection extends ActiveRecord
     {
         return $this->name ?: $this->title;
     }
+
+    public function afterSave($insert, $changedAttributes): void
+    {
+        parent::afterSave($insert, $changedAttributes);
+
+        if ($insert) {
+            return;
+        }
+
+        if (!array_key_exists('name', $changedAttributes) && !array_key_exists('title', $changedAttributes)) {
+            return;
+        }
+
+        \Yii::$container->get(\app\services\catalog\CatalogModelProductSyncService::class)
+            ->refreshDerivedNamesForCatalogCollectionId((int)$this->id);
+    }
 }

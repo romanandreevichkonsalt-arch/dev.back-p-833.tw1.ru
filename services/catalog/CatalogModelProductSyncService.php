@@ -165,6 +165,239 @@ class CatalogModelProductSyncService
         }
     }
 
+    /**
+     * Обновляет title, slug и href у SKU без полного sync модели (создание/удаление SKU не выполняется).
+     *
+     * @param int[] $fabricColorIds
+     */
+    public function refreshDerivedNamesForFabricColorIds(array $fabricColorIds): int
+    {
+        $fabricColorIds = array_values(array_filter(array_map('intval', $fabricColorIds), static fn (int $id): bool => $id > 0));
+        if ($fabricColorIds === []) {
+            return 0;
+        }
+
+        $productIds = CatalogProduct::find()
+            ->select('id')
+            ->where(['fabric_color_id' => $fabricColorIds])
+            ->column();
+
+        return $this->refreshDerivedNamesForProductIds($productIds);
+    }
+
+    public function refreshDerivedNamesForFabricCollectionId(int $fabricCollectionId): int
+    {
+        if ($fabricCollectionId <= 0) {
+            return 0;
+        }
+
+        $colorIds = CatalogFabricColor::find()
+            ->select('id')
+            ->where(['fabric_collection_id' => $fabricCollectionId])
+            ->column();
+
+        return $this->refreshDerivedNamesForFabricColorIds($colorIds);
+    }
+
+    public function refreshDerivedNamesForCatalogColorId(int $catalogColorId): int
+    {
+        if ($catalogColorId <= 0) {
+            return 0;
+        }
+
+        $fabricColorIds = CatalogFabricColor::find()
+            ->select('id')
+            ->where(['color_id' => $catalogColorId])
+            ->column();
+
+        return $this->refreshDerivedNamesForFabricColorIds($fabricColorIds);
+    }
+
+    public function refreshDerivedNamesForCatalogCollectionId(int $catalogCollectionId): int
+    {
+        if ($catalogCollectionId <= 0) {
+            return 0;
+        }
+
+        $productIds = CatalogProduct::find()
+            ->select('id')
+            ->where(['collection_id' => $catalogCollectionId])
+            ->column();
+
+        return $this->refreshDerivedNamesForProductIds($productIds);
+    }
+
+    public function refreshDerivedNamesForSubcategoryId(int $subcategoryId): int
+    {
+        if ($subcategoryId <= 0) {
+            return 0;
+        }
+
+        $productIds = CatalogProduct::find()
+            ->select('id')
+            ->where(['subcategory_id' => $subcategoryId])
+            ->column();
+
+        return $this->refreshDerivedNamesForProductIds($productIds);
+    }
+
+    /**
+     * @param int[] $fabricColorIds
+     */
+    public function refreshFabricProductActiveForFabricColorIds(array $fabricColorIds): int
+    {
+        $fabricColorIds = array_values(array_filter(array_map('intval', $fabricColorIds), static fn (int $id): bool => $id > 0));
+        if ($fabricColorIds === []) {
+            return 0;
+        }
+
+        $updated = 0;
+        foreach (
+            CatalogProduct::find()
+                ->where(['fabric_color_id' => $fabricColorIds])
+                ->with([
+                    'catalogModel',
+                    'fabricColor.fabricCollection',
+                ])
+                ->batch(100) as $products
+        ) {
+            foreach ($products as $product) {
+                if (!$product instanceof CatalogProduct) {
+                    continue;
+                }
+                $model = $product->catalogModel;
+                $color = $product->fabricColor;
+                if ($model === null || $color === null) {
+                    continue;
+                }
+                $isActive = $this->resolveFabricProductIsActive($model, $color);
+                if ((bool)$product->is_active === $isActive) {
+                    continue;
+                }
+                $product->is_active = $isActive;
+                $product->save(false, ['is_active']);
+                $updated++;
+            }
+        }
+
+        return $updated;
+    }
+
+    public function refreshFabricProductActiveForFabricCollectionId(int $fabricCollectionId): int
+    {
+        if ($fabricCollectionId <= 0) {
+            return 0;
+        }
+
+        $colorIds = CatalogFabricColor::find()
+            ->select('id')
+            ->where(['fabric_collection_id' => $fabricCollectionId])
+            ->column();
+
+        return $this->refreshFabricProductActiveForFabricColorIds($colorIds);
+    }
+
+    /**
+     * @param int[]|string[] $productIds
+     */
+    private function refreshDerivedNamesForProductIds(array $productIds): int
+    {
+        $productIds = array_values(array_filter(array_map('intval', $productIds), static fn (int $id): bool => $id > 0));
+        if ($productIds === []) {
+            return 0;
+        }
+
+        $updated = 0;
+        foreach (
+            CatalogProduct::find()
+                ->where(['id' => $productIds])
+                ->with([
+                    'catalogModel.collection',
+                    'catalogModel.subcategory',
+                    'catalogModel.category',
+                    'fabricColor.catalogColor',
+                    'fabricColor.fabricCollection',
+                ])
+                ->batch(100) as $products
+        ) {
+            foreach ($products as $product) {
+                if (!$product instanceof CatalogProduct) {
+                    continue;
+                }
+                if ($this->refreshDerivedNamesForProduct($product)) {
+                    $updated++;
+                }
+            }
+        }
+
+        return $updated;
+    }
+
+    private function refreshDerivedNamesForProduct(CatalogProduct $product): bool
+    {
+        $model = $product->catalogModel;
+        if ($model === null) {
+            return false;
+        }
+
+        $productId = (int)$product->id;
+        if ($product->fabric_color_id === null || (bool)$product->is_custom) {
+            $derived = $this->computeDefaultProductDerivedNames($model, $productId);
+        } else {
+            $color = $product->fabricColor;
+            if ($color === null) {
+                return false;
+            }
+            $derived = $this->computeFabricProductDerivedNames($model, $color, $productId);
+        }
+
+        $changed = false;
+        foreach (['title', 'slug', 'href'] as $attribute) {
+            if ($product->{$attribute} !== $derived[$attribute]) {
+                $product->{$attribute} = $derived[$attribute];
+                $changed = true;
+            }
+        }
+
+        if (!$changed) {
+            return false;
+        }
+
+        $product->save(false, ['title', 'slug', 'href']);
+
+        return true;
+    }
+
+    /**
+     * @return array{title: string, slug: string, href: string}
+     */
+    private function computeFabricProductDerivedNames(CatalogModel $model, CatalogFabricColor $color, int $productId): array
+    {
+        $title = ProductTitleBuilder::build($model, $color);
+        $slug = $this->buildProductSlugFromTitle($title, $productId);
+
+        return [
+            'title' => $title,
+            'slug' => $slug,
+            'href' => $this->buildProductHref($model, $slug),
+        ];
+    }
+
+    /**
+     * @return array{title: string, slug: string, href: string}
+     */
+    private function computeDefaultProductDerivedNames(CatalogModel $model, int $productId): array
+    {
+        $title = ProductTitleBuilder::buildDefault($model);
+        $slug = $this->buildProductSlugFromTitle($title, $productId);
+
+        return [
+            'title' => $title,
+            'slug' => $slug,
+            'href' => $this->buildProductHref($model, $slug),
+        ];
+    }
+
     private function syncDefaultProduct(CatalogModel $model): void
     {
         $product = CatalogProduct::find()

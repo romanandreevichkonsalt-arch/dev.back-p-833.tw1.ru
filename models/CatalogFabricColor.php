@@ -51,7 +51,7 @@ class CatalogFabricColor extends ActiveRecord
             [['design_code'], 'string', 'max' => 255],
             [['api_label'], 'string', 'max' => 255],
             [['source_photo_url'], 'string', 'max' => 512],
-            [['import_comment'], 'string'],
+            [['import_comment', 'description'], 'string'],
             [['is_active', 'is_recommended_fabric'], 'boolean'],
             [['fabric_collection_id', 'design_code'], 'unique', 'targetAttribute' => ['fabric_collection_id', 'design_code']],
             [['fabric_collection_id'], 'exist', 'targetClass' => CatalogFabricCollection::class, 'targetAttribute' => ['fabric_collection_id' => 'id']],
@@ -71,6 +71,7 @@ class CatalogFabricColor extends ActiveRecord
             'is_active' => 'Активен',
             'is_recommended_fabric' => 'Реком. ткань',
             'position_number' => '№ позиции',
+            'description' => 'Описание цветодизайна',
         ];
     }
 
@@ -289,8 +290,16 @@ class CatalogFabricColor extends ActiveRecord
             'texture' => $this->fabricCollection?->texture,
             'isRecommendedFabric' => (bool)$this->is_recommended_fabric,
             'positionNumber' => $this->position_number !== null ? (int)$this->position_number : null,
+            'description' => $this->getDescriptionForApi(),
             'swatches' => $this->collectSwatchesApiPayload(),
         ];
+    }
+
+    public function getDescriptionForApi(): ?string
+    {
+        $description = trim((string)($this->description ?? ''));
+
+        return $description !== '' ? $description : null;
     }
 
     public function getSwatchPreviewUrl(): ?string

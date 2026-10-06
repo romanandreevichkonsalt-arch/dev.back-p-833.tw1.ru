@@ -111,4 +111,16 @@ class CatalogColor extends ActiveRecord
 
         return 'background-color: #d4d0c8;';
     }
+
+    public function afterSave($insert, $changedAttributes): void
+    {
+        parent::afterSave($insert, $changedAttributes);
+
+        if ($insert || !array_key_exists('label', $changedAttributes)) {
+            return;
+        }
+
+        \Yii::$container->get(\app\services\catalog\CatalogModelProductSyncService::class)
+            ->refreshDerivedNamesForCatalogColorId((int)$this->id);
+    }
 }

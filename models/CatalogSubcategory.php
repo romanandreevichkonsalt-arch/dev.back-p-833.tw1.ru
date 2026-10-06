@@ -59,4 +59,16 @@ class CatalogSubcategory extends ActiveRecord
     {
         return $this->hasMany(CatalogProduct::class, ['subcategory_id' => 'id']);
     }
+
+    public function afterSave($insert, $changedAttributes): void
+    {
+        parent::afterSave($insert, $changedAttributes);
+
+        if ($insert || !array_key_exists('label', $changedAttributes)) {
+            return;
+        }
+
+        \Yii::$container->get(\app\services\catalog\CatalogModelProductSyncService::class)
+            ->refreshDerivedNamesForSubcategoryId((int)$this->id);
+    }
 }
