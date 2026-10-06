@@ -32,25 +32,33 @@ class SearchDocumentBuilder
      */
     public function compactIndexDocument(array $document): array
     {
-        unset($document['description'], $document['subtitle'], $document['priceDisplay'], $document['_searchText']);
-
-        if (isset($document['images']) && $document['images'] === []) {
-            unset($document['images']);
-        }
+        unset(
+            $document['description'],
+            $document['subtitle'],
+            $document['priceDisplay'],
+            $document['_searchText'],
+            $document['images'],
+            $document['model'],
+            $document['swatches'],
+            $document['swatchCount'],
+            $document['materials'],
+            $document['dimensions'],
+        );
 
         if (isset($document['image']) && is_array($document['image'])) {
             $document['image'] = $this->compactImagePayload($document['image']);
         }
 
-        if (isset($document['images']) && is_array($document['images'])) {
-            $document['images'] = array_values(array_map(
-                fn (mixed $image): array => is_array($image) ? $this->compactImagePayload($image) : ['src' => '', 'alt' => ''],
-                $document['images']
-            ));
-        }
-
         if (isset($document['badge']) && is_array($document['badge'])) {
             unset($document['badge']['image']);
+        }
+
+        // Keep haystack short: match needs tokens, not full product essays.
+        if (isset($document['_searchHaystackNormalized']) && is_string($document['_searchHaystackNormalized'])) {
+            $haystack = $document['_searchHaystackNormalized'];
+            if (mb_strlen($haystack) > 240) {
+                $document['_searchHaystackNormalized'] = mb_substr($haystack, 0, 240);
+            }
         }
 
         return $document;
@@ -73,51 +81,16 @@ class SearchDocumentBuilder
      */
     public function buildSearchText(array $item): string
     {
+        // Lite index: skip long description / specs — they inflate FileCache and slow str_contains.
         $parts = [
             $item['title'] ?? '',
             $item['subtitle'] ?? '',
-            $item['description'] ?? '',
             $item['type'] ?? '',
             $item['subcategoryLabel'] ?? '',
             $item['collection'] ?? '',
             $item['fabricColorLabel'] ?? '',
             $item['id'] ?? '',
         ];
-
-        if (isset($item['materials']) && is_array($item['materials'])) {
-            $parts = array_merge($parts, array_values(array_filter($item['materials'], static fn ($v): bool => is_string($v) && $v !== '')));
-        }
-
-        if (isset($item['dimensions']) && is_array($item['dimensions'])) {
-            $parts = array_merge($parts, array_values(array_filter($item['dimensions'], static fn ($v): bool => is_string($v) && $v !== '')));
-        }
-
-        $model = $item['model'] ?? null;
-        if (is_array($model)) {
-            foreach ([
-                'title',
-                'subtitle',
-                'description',
-                'type',
-                'collection',
-                'category',
-                'categoryLabel',
-                'subcategory',
-                'layout',
-            ] as $field) {
-                if (!empty($model[$field]) && is_string($model[$field])) {
-                    $parts[] = $model[$field];
-                }
-            }
-
-            if (isset($model['materials']) && is_array($model['materials'])) {
-                $parts = array_merge($parts, array_values(array_filter($model['materials'], static fn ($v): bool => is_string($v) && $v !== '')));
-            }
-
-            if (isset($model['dimensions']) && is_array($model['dimensions'])) {
-                $parts = array_merge($parts, array_values(array_filter($model['dimensions'], static fn ($v): bool => is_string($v) && $v !== '')));
-            }
-        }
 
         if (isset($item['fabricColor']) && is_array($item['fabricColor'])) {
             foreach (['label', 'collection'] as $field) {

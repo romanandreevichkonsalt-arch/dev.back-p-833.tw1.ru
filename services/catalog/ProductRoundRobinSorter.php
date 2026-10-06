@@ -22,9 +22,15 @@ class ProductRoundRobinSorter
         bool $orderGroupsByBucketHead = false,
         array $priorityGroupKeys = [],
         bool $rotateIntraBuckets = true,
+        ?int $maxResults = null,
     ): array
     {
         if ($rows === []) {
+            return [];
+        }
+
+        $maxResults = $maxResults !== null ? max(0, $maxResults) : null;
+        if ($maxResults === 0) {
             return [];
         }
 
@@ -114,6 +120,9 @@ class ProductRoundRobinSorter
                 if ($buckets[$key] === []) {
                     unset($buckets[$key]);
                 }
+                if ($maxResults !== null && count($ordered) >= $maxResults) {
+                    return $ordered;
+                }
             }
 
             foreach ($deferredKeys as $key) {
@@ -127,6 +136,9 @@ class ProductRoundRobinSorter
                 $emitted = true;
                 if ($buckets[$key] === []) {
                     unset($buckets[$key]);
+                }
+                if ($maxResults !== null && count($ordered) >= $maxResults) {
+                    return $ordered;
                 }
             }
 

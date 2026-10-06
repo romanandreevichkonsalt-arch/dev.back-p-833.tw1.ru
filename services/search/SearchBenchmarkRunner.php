@@ -55,10 +55,11 @@ final class SearchBenchmarkRunner
         }
 
         $t0 = microtime(true);
-        $matchedProducts = $this->productOrdering->orderAll($matchedProducts);
-        $steps[] = $this->step('orderAll', $t0, ['matches' => count($matchedProducts)]);
-
-        $responseSlice = array_slice($matchedProducts, 0, $limit);
+        $responseSlice = $this->productOrdering->orderPage($matchedProducts, 1, $limit);
+        $steps[] = $this->step('orderPage', $t0, [
+            'matches' => count($matchedProducts),
+            'slice' => count($responseSlice),
+        ]);
 
         $t0 = microtime(true);
         $categoriesFound = $this->categoriesFoundAggregator->aggregate($matchedProducts);

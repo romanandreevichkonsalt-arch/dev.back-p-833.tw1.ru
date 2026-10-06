@@ -296,17 +296,39 @@ class CatalogService
     public function getSearchableProducts(): array
     {
         $config = \Yii::$app->params['apiCache'] ?? [];
+        $softTtl = (int)($config['searchIndexSoftTtl'] ?? $config['catalogProductsTtl'] ?? 600);
+        $hardTtl = (int)($config['searchIndexHardTtl'] ?? 86400);
 
-        return $this->cache->get(
+        return $this->cache->getSoft(
             'catalog',
-            'searchable-products',
-            function (): array {
-                @ini_set('memory_limit', '512M');
-
-                return $this->buildSearchableProducts();
-            },
-            (int)($config['catalogProductsTtl'] ?? 300)
+            // v3: lean SQL build + soft/hard TTL (stale-while-revalidate)
+            'searchable-products-lite-v3',
+            fn (): array => $this->buildSearchableProducts(),
+            max(60, $softTtl),
+            max(300, $hardTtl),
         );
+    }
+
+    /**
+     * Synchronous rebuild + store (warm/cron). Bypasses soft-TTL stale return.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function rebuildSearchableProductsIndex(): array
+    {
+        $config = \Yii::$app->params['apiCache'] ?? [];
+        $hardTtl = (int)($config['searchIndexHardTtl'] ?? 86400);
+        $docs = $this->buildSearchableProducts();
+        $this->cache->putSoft('catalog', 'searchable-products-lite-v3', $docs, max(300, $hardTtl));
+
+        // Drop refresh lock if a soft-expire request spawned us.
+        $lockKey = sprintf(
+            'api:catalog:v%d:searchable-products-lite-v3:refresh-lock',
+            $this->cache->getVersion()
+        );
+        \Yii::$app->cache->delete($lockKey);
+
+        return $docs;
     }
 
     private function buildSearchableProducts(): array
@@ -318,33 +340,7 @@ class CatalogService
             );
         }
 
-        $query = CatalogProduct::find()
-            ->alias('p')
-            ->where(['p.is_active' => true, 'p.is_custom' => false]);
-
-        CatalogProductPublicVisibility::apply($query, 'p');
-
-        $query->with([
-                'image',
-                'collection.direction',
-                'subcategory.category',
-                'badge.image',
-                'catalogModel.modelPrices',
-                'fabricColor.fabricCollection',
-            ])
-            ->orderBy(['p.sort_order' => SORT_ASC]);
-
-        $builder = new \app\services\search\SearchDocumentBuilder();
-        $documents = [];
-
-        /** @var CatalogProduct[] $products */
-        foreach ($query->batch(200) as $products) {
-            foreach ($products as $product) {
-                $documents[] = $builder->enrichProduct($product->toSearchIndexDocument());
-            }
-        }
-
-        return $documents;
+        return (new \app\services\search\SearchLiteIndexBuilder())->build();
     }
 
     private function hasCatalogData(): bool

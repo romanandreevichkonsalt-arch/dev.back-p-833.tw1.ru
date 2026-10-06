@@ -197,14 +197,118 @@ class SearchService
      */
     public function matchProductsLegacyFallbackForBench(string $query, array $bootstrap, array $products): array
     {
+        $matchResult = [
+            'raw' => $query,
+            'correction' => null,
+            'matchType' => SearchTitleMatcher::MATCH_NONE,
+            'matchedQuery' => null,
+        ];
+
+        return $this->runRankerFallback($query, $bootstrap, $products, $matchResult);
+    }
+
+    /**
+     * Legacy haystack ranker after TitleMatcher miss. Caps work: candidate prefilter + score limit.
+     *
+     * @param array{frequent: list<string>, categories: list<array<string, mixed>>} $bootstrap
+     * @param list<array<string, mixed>> $products
+     * @param array<string, mixed> $matchResult
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function runRankerFallback(string $query, array $bootstrap, array $products, array &$matchResult): array
+    {
         $legacyVocabulary = $this->buildLegacyVocabulary($bootstrap);
         $resolved = $this->queryResolver->resolve($query, $legacyVocabulary);
+        $raw = $resolved['raw'];
 
-        return $this->ranker->matchProducts(
-            $products,
-            $resolved['raw'],
-            $resolved['raw']
-        );
+        $candidates = $this->prefilterRankerCandidates($products, $raw);
+        $matchedProducts = $candidates === []
+            ? []
+            : $this->ranker->matchProducts(
+                $candidates,
+                $raw,
+                $raw,
+                max(SearchRanker::MAX_PRODUCTS * 3, 48),
+            );
+
+        $matchResult['raw'] = $raw;
+        $matchResult['correction'] = $resolved['correction'];
+        $matchResult['matchType'] = $matchedProducts === []
+            ? SearchTitleMatcher::MATCH_NONE
+            : SearchTitleMatcher::MATCH_SIMILAR;
+        $matchResult['matchedQuery'] = $raw;
+
+        return $matchedProducts;
+    }
+
+    /**
+     * Cheap contains prefilter so miss queries do not score all ~14k SKUs.
+     *
+     * @param list<array<string, mixed>> $products
+     * @return list<array<string, mixed>>
+     */
+    private function prefilterRankerCandidates(array $products, string $normalizedQuery): array
+    {
+        $normalizedQuery = trim($normalizedQuery);
+        if ($normalizedQuery === '' || mb_strlen($normalizedQuery) < SearchQueryResolver::MIN_PRODUCT_QUERY_LENGTH) {
+            return [];
+        }
+
+        $tokens = preg_split('/\s+/u', $normalizedQuery) ?: [];
+        $tokens = array_values(array_filter(
+            $tokens,
+            static fn (string $token): bool => mb_strlen($token) >= SearchQueryResolver::MIN_PRODUCT_QUERY_LENGTH
+        ));
+
+        // Long single-token garbage (e.g. xyzzy…) almost never hits titles; skip fat haystack scans.
+        $scanHaystack = count($tokens) > 1 || mb_strlen($normalizedQuery) <= 16;
+
+        // Fast reject: no title can contain a needle longer than itself.
+        if (!$scanHaystack) {
+            $needleLen = mb_strlen($normalizedQuery);
+            $candidates = [];
+            foreach ($products as $product) {
+                $title = (string)($product['_titleNormalized'] ?? '');
+                if ($title === '' || mb_strlen($title) < $needleLen) {
+                    continue;
+                }
+                if (str_contains($title, $normalizedQuery)) {
+                    $candidates[] = $product;
+                }
+            }
+
+            return $candidates;
+        }
+
+        $candidates = [];
+        foreach ($products as $product) {
+            $title = (string)($product['_titleNormalized'] ?? '');
+            $haystack = (string)($product['_searchHaystackNormalized'] ?? $title);
+            if ($title === '' && $haystack === '') {
+                continue;
+            }
+
+            if (
+                ($title !== '' && str_contains($title, $normalizedQuery))
+                || ($haystack !== '' && str_contains($haystack, $normalizedQuery))
+            ) {
+                $candidates[] = $product;
+                continue;
+            }
+
+            foreach ($tokens as $token) {
+                if (
+                    ($title !== '' && str_contains($title, $token))
+                    || ($haystack !== '' && str_contains($haystack, $token))
+                ) {
+                    $candidates[] = $product;
+                    break;
+                }
+            }
+        }
+
+        return $candidates;
     }
 
     /**
@@ -257,25 +361,11 @@ class SearchService
         $matchedProducts = $matchResult['products'];
 
         if ($matchedProducts === []) {
-            $legacyVocabulary = $this->buildLegacyVocabulary($bootstrap);
-            $resolved = $this->queryResolver->resolve($query, $legacyVocabulary);
-            $matchedProducts = $this->ranker->matchProducts(
-                $products,
-                $resolved['raw'],
-                $resolved['raw']
-            );
-            $matchResult['raw'] = $resolved['raw'];
-            $matchResult['correction'] = $resolved['correction'];
-            $matchResult['matchType'] = $matchedProducts === []
-                ? SearchTitleMatcher::MATCH_NONE
-                : SearchTitleMatcher::MATCH_SIMILAR;
-            $matchResult['matchedQuery'] = $resolved['raw'];
+            $matchedProducts = $this->runRankerFallback($query, $bootstrap, $products, $matchResult);
         }
 
-        $matchedProducts = $this->productOrdering->orderAll($matchedProducts);
-
-        $responseSlice = array_slice($matchedProducts, 0, $limit);
-
+        // Autocomplete: same top-N as orderAll+slice, without sorting the entire match set.
+        $responseSlice = $this->productOrdering->orderPage($matchedProducts, 1, $limit);
         $categoriesFound = $this->categoriesFoundAggregator->aggregate($matchedProducts);
 
         if ($dealer !== null && $dealer->isDealer()) {
@@ -326,19 +416,7 @@ class SearchService
         $matchedProducts = $matchResult['products'];
 
         if ($matchedProducts === []) {
-            $legacyVocabulary = $this->buildLegacyVocabulary($bootstrap);
-            $resolved = $this->queryResolver->resolve($query, $legacyVocabulary);
-            $matchedProducts = $this->ranker->matchProducts(
-                $products,
-                $resolved['raw'],
-                $resolved['raw']
-            );
-            $matchResult['raw'] = $resolved['raw'];
-            $matchResult['correction'] = $resolved['correction'];
-            $matchResult['matchType'] = $matchedProducts === []
-                ? SearchTitleMatcher::MATCH_NONE
-                : SearchTitleMatcher::MATCH_SIMILAR;
-            $matchResult['matchedQuery'] = $resolved['raw'];
+            $matchedProducts = $this->runRankerFallback($query, $bootstrap, $products, $matchResult);
         }
 
         if ($sort === 'default' || $sort === '') {

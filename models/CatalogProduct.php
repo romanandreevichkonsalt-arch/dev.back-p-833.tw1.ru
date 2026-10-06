@@ -17,7 +17,8 @@ class CatalogProduct extends ActiveRecord
 
     private const LISTING_GALLERY_MAX = 6;
 
-    private const SEARCH_INDEX_GALLERY_MAX = 7;
+    /** One image is enough for autocomplete cards; gallery bloated FileCache (~52MB). */
+    private const SEARCH_INDEX_GALLERY_MAX = 1;
 
     protected function slugSourceAttribute(): string
     {

@@ -315,7 +315,12 @@ class SearchTitleMatcher
      */
     private function normalizedTitle(array $product): string
     {
-        return $this->resolver->normalize((string)($product['title'] ?? ''));
+        $cached = $product['_titleNormalized'] ?? null;
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        return $this->resolver->normalize((string)($product['title'] ?? $product['name'] ?? ''));
     }
 
     private function toSlugCandidate(string $normalizedQuery): string
