@@ -2,16 +2,22 @@
 
 namespace app\services\search;
 
+use app\models\CatalogModelImage;
 use app\models\CatalogProduct;
 use app\models\MediaFile;
 use app\services\catalog\CatalogProductPublicVisibility;
 use app\services\catalog\CatalogUrlSlugResolver;
+use Yii;
+use yii\db\Query;
 
 /**
  * Fast searchable index build: asArray hydrate, no TEXT columns, no modelPrices/DealerPricing.
  */
 final class SearchLiteIndexBuilder
 {
+    /** @var array<int, array<string, mixed>> model_id => media row (first angle) */
+    private array $modelPrimaryImages = [];
+
     public function __construct(
         private readonly SearchDocumentBuilder $documentBuilder = new SearchDocumentBuilder(),
         private readonly CatalogUrlSlugResolver $slugResolver = new CatalogUrlSlugResolver(),
@@ -25,6 +31,8 @@ final class SearchLiteIndexBuilder
     public function build(): array
     {
         @ini_set('memory_limit', '512M');
+
+        $this->modelPrimaryImages = $this->loadModelPrimaryImages();
 
         $query = CatalogProduct::find()
             ->alias('p')
@@ -67,10 +75,22 @@ final class SearchLiteIndexBuilder
                     ]);
                 },
                 'collection' => static function ($q): void {
-                    $q->select(['id', 'name', 'title', 'direction_id', 'sort_order', 'slug']);
+                    $q->select(['id', 'name', 'title', 'direction_id', 'sort_order', 'slug', 'image_id']);
                 },
                 'collection.direction' => static function ($q): void {
                     $q->select(['id', 'slug']);
+                },
+                'collection.image' => static function ($q): void {
+                    $q->select([
+                        'id',
+                        'path',
+                        'path_medium',
+                        'path_mini',
+                        'path_large',
+                        'alt',
+                        'filename',
+                        'kind',
+                    ]);
                 },
                 'subcategory' => static function ($q): void {
                     $q->select(['id', 'label', 'slug', 'url_slug', 'category_id']);
@@ -108,6 +128,46 @@ final class SearchLiteIndexBuilder
         }
 
         return $documents;
+    }
+
+    /**
+     * Same fallback chain as CatalogProduct::resolvePrimaryImagePayload(forListing: true),
+     * but one SQL for all model first-angles (SKU almost never have product.image_id).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function loadModelPrimaryImages(): array
+    {
+        $rows = (new Query())
+            ->select([
+                'mi.model_id',
+                'm.path',
+                'm.path_medium',
+                'm.path_mini',
+                'm.path_large',
+                'm.alt',
+                'm.filename',
+            ])
+            ->from(['mi' => CatalogModelImage::tableName()])
+            ->innerJoin(['m' => MediaFile::tableName()], '[[m.id]] = [[mi.media_file_id]]')
+            ->where(['mi.purpose' => CatalogModelImage::PURPOSE_ANGLE])
+            ->orderBy([
+                'mi.model_id' => SORT_ASC,
+                'mi.sort_order' => SORT_ASC,
+                'mi.id' => SORT_ASC,
+            ])
+            ->all(Yii::$app->db);
+
+        $map = [];
+        foreach ($rows as $row) {
+            $modelId = (int)$row['model_id'];
+            if (isset($map[$modelId])) {
+                continue;
+            }
+            $map[$modelId] = $row;
+        }
+
+        return $map;
     }
 
     /**
@@ -158,9 +218,12 @@ final class SearchLiteIndexBuilder
         $subcategoryLabel = $subcategory !== null ? (string)($subcategory['label'] ?? '') : null;
         $fabricColorLabel = $this->fabricColorApiLabel($fabricColor, $fabricCollection);
 
-        $image = $this->listingImagePayload(
+        $image = $this->resolvePrimaryListingImage(
             is_array($product['image'] ?? null) ? $product['image'] : null,
-            (string)$product['title']
+            $modelId,
+            is_array($collection['image'] ?? null) ? $collection['image'] : null,
+            (string)$product['title'],
+            $collectionName !== '' ? $collectionName : (string)$product['title'],
         );
 
         $badge = null;
@@ -227,6 +290,46 @@ final class SearchLiteIndexBuilder
         }
 
         return $item;
+    }
+
+    /**
+     * @param array<string, mixed>|null $productImage
+     * @param array<string, mixed>|null $collectionImage
+     * @return array{src: string|null, alt: string}
+     */
+    private function resolvePrimaryListingImage(
+        ?array $productImage,
+        int $modelId,
+        ?array $collectionImage,
+        string $productTitle,
+        string $collectionAlt,
+    ): array {
+        $image = $this->listingImagePayload($productImage, $productTitle);
+        if ($this->hasImageSrc($image)) {
+            return $image;
+        }
+
+        if ($modelId > 0 && isset($this->modelPrimaryImages[$modelId])) {
+            $image = $this->listingImagePayload($this->modelPrimaryImages[$modelId], $productTitle);
+            if ($this->hasImageSrc($image)) {
+                return $image;
+            }
+        }
+
+        $image = $this->listingImagePayload($collectionImage, $collectionAlt);
+        if ($this->hasImageSrc($image)) {
+            return $image;
+        }
+
+        return MediaFile::emptyImagePayload($productTitle);
+    }
+
+    /**
+     * @param array{src: string|null, alt: string} $image
+     */
+    private function hasImageSrc(array $image): bool
+    {
+        return trim((string)($image['src'] ?? '')) !== '';
     }
 
     /**
