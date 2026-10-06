@@ -33,8 +33,7 @@ class CatalogCacheController extends Controller
         $this->stdout("→ catalog/menu\n");
         $catalog->getMenu();
 
-        $this->stdout("→ catalog/searchable-products\n");
-        $catalog->getSearchableProducts();
+        $this->actionWarmSearch();
 
         $listing = \Yii::$container->get(CatalogProductListingService::class);
         $this->stdout("→ catalog/products (guest, p1, scope=all)\n");
@@ -43,6 +42,18 @@ class CatalogCacheController extends Controller
             'perPage' => 24,
             'sort' => 'default',
         ], null);
+
+        $this->stdout("Готово.\n");
+
+        return ExitCode::OK;
+    }
+
+    /**
+     * Only search index + vocabulary + sample queries (for cron / after import).
+     */
+    public function actionWarmSearch(): int
+    {
+        $this->actionRebuildSearchIndex();
 
         $search = new SearchService();
         $this->stdout("→ search/bootstrap\n");
@@ -56,7 +67,22 @@ class CatalogCacheController extends Controller
             $search->searchProducts($query, 1, 24, 'default');
         }
 
-        $this->stdout("Готово.\n");
+        $this->stdout("Search cache warm done.\n");
+
+        return ExitCode::OK;
+    }
+
+    /**
+     * Force lean searchable-products rebuild (used by soft-TTL background refresh).
+     */
+    public function actionRebuildSearchIndex(): int
+    {
+        $catalog = \Yii::$container->get(CatalogService::class);
+
+        $this->stdout("→ catalog/searchable-products (lean rebuild)\n");
+        $t0 = microtime(true);
+        $docs = $catalog->rebuildSearchableProductsIndex();
+        $this->stdout(sprintf("   %d sku in %.2fs\n", count($docs), microtime(true) - $t0));
 
         return ExitCode::OK;
     }

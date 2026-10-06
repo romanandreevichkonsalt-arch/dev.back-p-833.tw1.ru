@@ -56,20 +56,23 @@ class SearchProductOrderingService
 
         $priorityDocs = $this->resolvePriorityDocuments($documents);
         $priorityCount = count($priorityDocs);
-        $body = $this->sortCollectionPriceRoundRobin(
-            $this->excludeDocumentsByProductId($documents, $this->productIdsFromDocuments($priorityDocs))
-        );
+        $bodyDocs = $this->excludeDocumentsByProductId($documents, $this->productIdsFromDocuments($priorityDocs));
 
         if ($page <= 1) {
             $take = max(0, $perPage - $priorityCount);
+            // Stop round-robin after enough body rows (autocomplete / page 1).
+            $body = $this->sortCollectionPriceRoundRobin($bodyDocs, $take);
 
-            return array_merge($priorityDocs, array_slice($body, 0, $take));
+            return array_merge($priorityDocs, $body);
         }
 
         $bodyOffset = ($page - 1) * $perPage - $priorityCount;
         if ($bodyOffset < 0) {
             $bodyOffset = 0;
         }
+
+        // Need a prefix long enough to slice the requested page.
+        $body = $this->sortCollectionPriceRoundRobin($bodyDocs, $bodyOffset + $perPage);
 
         return array_slice($body, $bodyOffset, $perPage);
     }
@@ -78,9 +81,13 @@ class SearchProductOrderingService
      * @param list<array<string, mixed>> $documents
      * @return list<array<string, mixed>>
      */
-    private function sortCollectionPriceRoundRobin(array $documents): array
+    /**
+     * @param list<array<string, mixed>> $documents
+     * @return list<array<string, mixed>>
+     */
+    private function sortCollectionPriceRoundRobin(array $documents, ?int $maxResults = null): array
     {
-        if ($documents === []) {
+        if ($documents === [] || $maxResults === 0) {
             return [];
         }
 
@@ -90,7 +97,7 @@ class SearchProductOrderingService
         }
 
         $ordered = [];
-        foreach ($this->roundRobin->sortIds($rows, false, [], false) as $index) {
+        foreach ($this->roundRobin->sortIds($rows, false, [], false, $maxResults) as $index) {
             $ordered[] = $documents[(int)$index];
         }
 

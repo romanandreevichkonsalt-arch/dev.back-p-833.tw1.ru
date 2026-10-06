@@ -92,6 +92,9 @@ return [
         'defaultTtl' => 300,
         'catalogMenuTtl' => 900,
         'catalogProductsTtl' => 300,
+        // Search index: soft TTL triggers background refresh; hard keeps stale serveable.
+        'searchIndexSoftTtl' => 900,
+        'searchIndexHardTtl' => 86400,
         'pageTtl' => 900,
     ],
     'corsOrigins' => [
