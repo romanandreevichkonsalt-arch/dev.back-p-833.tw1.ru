@@ -1323,7 +1323,7 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="JournalArticleBlock",
  *     type="object",
- *     description="Блок контента статьи",
+ *     description="Блок контента статьи (в CMS собирается из Markdown редактора)",
  *     required={"type"},
  *     @OA\Property(
  *         property="type",
@@ -1347,7 +1347,7 @@ use OpenApi\Annotations as OA;
  *         )
  *     ),
  *     @OA\Property(property="level", type="integer", nullable=true, example=2),
- *     @OA\Property(property="image", ref="#/components/schemas/CatalogImage", nullable=true),
+ *     @OA\Property(property="image", ref="#/components/schemas/CatalogImage", nullable=true, description="В CMS src — ID медиа или ID#medium|large|original; в API — CatalogImage с выбранным вариантом"),
  *     @OA\Property(property="caption", type="string", nullable=true),
  *     @OA\Property(property="author", type="string", nullable=true),
  *     @OA\Property(property="columns", type="integer", nullable=true, example=2),

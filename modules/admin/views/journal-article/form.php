@@ -9,7 +9,7 @@ use yii\widgets\ActiveForm;
 
 /** @var yii\web\View $this */
 /** @var JournalArticle $model */
-/** @var array<int, array<string, mixed>> $blocksForm */
+/** @var string $bodyMarkdown */
 /** @var list<array{catalog_product_id?: int|string, product_search?: string}> $recommendedForm */
 /** @var string $title */
 
@@ -72,10 +72,11 @@ $journalPageId = ContentPage::find()->select('id')->where(['slug' => 'journal'])
         <section class="admin-page-combined-section">
             <header class="admin-page-combined-section__head">
                 <h2 class="admin-page-combined-section__title">Контент статьи</h2>
-                <p class="admin-muted admin-page-combined-section__lead">Блоки в порядке отображения на странице.</p>
+                <p class="admin-muted admin-page-combined-section__lead">Единый текст статьи в Markdown; на сайте отображается как блоки.</p>
             </header>
             <div class="admin-page-block-panel">
-                <?= $this->render('_block_editor', ['blocksForm' => $blocksForm]) ?>
+                <?= $form->field($model, 'body_markdown', ['template' => "{error}"])->label(false) ?>
+                <?= $this->render('_markdown_editor', ['bodyMarkdown' => $bodyMarkdown ?? '']) ?>
             </div>
         </section>
 

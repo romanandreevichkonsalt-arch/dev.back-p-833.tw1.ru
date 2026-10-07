@@ -17,7 +17,7 @@ class JournalArticleService
         ?MediaUrlResolver $mediaUrls = null,
         ?JournalArticleRecommendedService $recommended = null,
     ) {
-        $this->mediaUrls = $mediaUrls ?? MediaUrlResolver::forPageContent();
+        $this->mediaUrls = $mediaUrls ?? MediaUrlResolver::forJournalArticles();
         $this->recommended = $recommended ?? new JournalArticleRecommendedService($this->mediaUrls);
     }
     /**

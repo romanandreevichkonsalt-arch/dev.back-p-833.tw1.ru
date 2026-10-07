@@ -10,6 +10,7 @@ use app\services\media\ListingFrameData;
 use app\services\media\ListingTileService;
 use app\services\media\LocalMediaStorage;
 use app\services\media\MediaContentValidator;
+use app\services\media\MediaUrlResolver;
 use Yii;
 use yii\data\ActiveDataProvider;
 use yii\helpers\Url;
@@ -382,6 +383,21 @@ class MediaController extends BaseController
         }
 
         return ['items' => $items];
+    }
+
+    public function actionPublicUrl(int $id): Response
+    {
+        $media = $this->findModel($id);
+        if (!$media->isImage()) {
+            throw new NotFoundHttpException('Файл не найден.');
+        }
+
+        $variant = trim((string)Yii::$app->request->get('variant', 'medium'));
+        if (!MediaUrlResolver::isAllowedVariant($variant)) {
+            $variant = 'medium';
+        }
+
+        return $this->redirect($media->getPublicUrl($variant));
     }
 
     public function actionLibraryList(): array

@@ -26,6 +26,37 @@ class MediaUrlResolver
         return new self('original');
     }
 
+    public static function forJournalArticles(): self
+    {
+        return new self('medium');
+    }
+
+    /**
+     * @return array{ref: string, variant: string|null}
+     */
+    public static function splitMediaReference(string $src): array
+    {
+        $src = trim($src);
+        if ($src === '') {
+            return ['ref' => '', 'variant' => null];
+        }
+
+        if (preg_match('/^(\d+)#(' . self::VARIANT_PATTERN . ')$/', $src, $matches) === 1) {
+            return ['ref' => $matches[1], 'variant' => $matches[2]];
+        }
+
+        return ['ref' => $src, 'variant' => null];
+    }
+
+    public static function isAllowedVariant(?string $variant): bool
+    {
+        return $variant !== null
+            && $variant !== ''
+            && preg_match('/^' . self::VARIANT_PATTERN . '$/', $variant) === 1;
+    }
+
+    private const VARIANT_PATTERN = 'mini|medium|large|original';
+
     public function resolve(string $src): string
     {
         $src = trim($src);
@@ -33,11 +64,12 @@ class MediaUrlResolver
             return $src;
         }
 
-        if (!ctype_digit($src)) {
+        ['ref' => $ref, 'variant' => $variantHint] = self::splitMediaReference($src);
+        if (!ctype_digit($ref)) {
             return $src;
         }
 
-        $id = (int)$src;
+        $id = (int)$ref;
         if ($id <= 0) {
             return $src;
         }
@@ -46,7 +78,14 @@ class MediaUrlResolver
             $this->preloadIds([$id]);
         }
 
-        return $this->urlCache[$id] !== '' ? $this->urlCache[$id] : $src;
+        if ($variantHint !== null) {
+            $media = MediaFile::findOne($id);
+            if ($media !== null) {
+                return $media->getPublicUrl($variantHint);
+            }
+        }
+
+        return $this->urlCache[$id] !== '' ? $this->urlCache[$id] : $ref;
     }
 
     /**
@@ -59,33 +98,41 @@ class MediaUrlResolver
             return null;
         }
 
-        if (ctype_digit($src)) {
-            $payload = $this->getImagePayload((int)$src);
-            if ($payload !== null) {
-                if ($alt !== null && trim($alt) !== '') {
-                    $payload['alt'] = trim($alt);
-                }
+        ['ref' => $ref, 'variant' => $variantHint] = self::splitMediaReference($src);
+        $variant = self::isAllowedVariant($variantHint) ? $variantHint : $this->defaultSrcVariant;
 
-                return $payload;
+        if (ctype_digit($ref)) {
+            $id = (int)$ref;
+            if ($id > 0) {
+                $this->preloadIds([$id]);
+                $media = MediaFile::findOne($id);
+                if ($media !== null) {
+                    $payload = $this->buildPayloadForMedia($media, $alt, $variant);
+                    if ($alt !== null && trim($alt) !== '') {
+                        $payload['alt'] = trim($alt);
+                    }
+
+                    return $payload;
+                }
             }
         }
 
-        if ($this->looksLikeUrl($src)) {
-            $media = $this->findMediaByPublicPath($src);
+        if ($this->looksLikeUrl($ref)) {
+            $media = $this->findMediaByPublicPath($ref);
             if ($media !== null) {
-                $payload = $this->buildPayloadForMedia($media, $alt);
+                $payload = $this->buildPayloadForMedia($media, $alt, $variant);
 
                 return $payload;
             }
 
             return [
-                'src' => $src,
+                'src' => $ref,
                 'alt' => trim((string)$alt),
             ];
         }
 
         return [
-            'src' => $this->resolve($src),
+            'src' => $this->resolve($ref . ($variantHint !== null ? '#' . $variantHint : '')),
             'alt' => trim((string)$alt),
         ];
     }
@@ -153,8 +200,13 @@ class MediaUrlResolver
 
         if ($this->isImageNode($node)) {
             $src = trim((string)($node['src'] ?? ''));
-            if ($src !== '' && ctype_digit($src)) {
-                $ids[] = (int)$src;
+            if ($src === '') {
+                return;
+            }
+
+            ['ref' => $ref] = self::splitMediaReference($src);
+            if (ctype_digit($ref)) {
+                $ids[] = (int)$ref;
             }
         }
 
@@ -235,9 +287,9 @@ class MediaUrlResolver
     /**
      * @return array<string, mixed>
      */
-    private function buildPayloadForMedia(MediaFile $file, ?string $alt = null): array
+    private function buildPayloadForMedia(MediaFile $file, ?string $alt = null, ?string $defaultSrc = null): array
     {
-        $payload = $file->toApiImagePayload($alt, $this->defaultSrcVariant);
+        $payload = $file->toApiImagePayload($alt, $defaultSrc ?? $this->defaultSrcVariant);
         if ($alt !== null && trim($alt) !== '') {
             $payload['alt'] = trim($alt);
         }

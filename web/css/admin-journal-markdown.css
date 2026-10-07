@@ -1,0 +1,58 @@
+.admin-journal-markdown .EasyMDEContainer {
+    border-radius: var(--admin-radius-md, 8px);
+    overflow: hidden;
+}
+
+.admin-journal-markdown .CodeMirror {
+    min-height: 360px;
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.admin-journal-markdown .editor-preview-side {
+    padding: 16px 20px;
+}
+
+.admin-journal-markdown .editor-preview-side img,
+.admin-journal-markdown .editor-preview-full img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 12px 0;
+}
+
+.admin-journal-markdown__hint {
+    margin-top: 12px;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.admin-journal-markdown__hint code {
+    font-size: 12px;
+}
+
+.admin-journal-markdown__textarea {
+    display: none;
+}
+
+.admin-journal-markdown .editor-toolbar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+}
+
+.admin-journal-markdown .editor-toolbar button i.fa {
+    display: inline-block;
+    width: 14px;
+    font-size: 14px;
+    line-height: 14px;
+    text-align: center;
+    vertical-align: middle;
+    color: #2c3e50;
+}
+
+.admin-journal-markdown .editor-toolbar button.heading-2 i.fa,
+.admin-journal-markdown .editor-toolbar button.heading-3 i.fa {
+    font-size: 13px;
+}

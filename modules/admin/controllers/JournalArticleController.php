@@ -4,9 +4,10 @@ namespace app\modules\admin\controllers;
 
 use app\models\ContentPage;
 use app\models\JournalArticle;
-use app\modules\admin\assets\JournalArticleAsset;
-use app\services\journal\JournalArticleBlockBuilder;
+use app\services\journal\JournalArticleMarkdownParser;
+use app\services\journal\JournalArticleMarkdownSerializer;
 use app\services\journal\JournalArticleRecommendedService;
+use app\modules\admin\assets\JournalArticleMarkdownAsset;
 use app\services\cache\ApiCacheInvalidator;
 use Yii;
 use yii\web\NotFoundHttpException;
@@ -63,11 +64,11 @@ class JournalArticleController extends BaseController
             return $this->redirect(['update', 'id' => $model->id]);
         }
 
-        JournalArticleAsset::register($this->view);
+        JournalArticleMarkdownAsset::register($this->view);
 
         return $this->render('form', [
             'model' => $model,
-            'blocksForm' => $this->blocksFormForView($model),
+            'bodyMarkdown' => $this->bodyMarkdownForView($model),
             'recommendedForm' => $this->recommendedFormForView($model),
             'title' => 'Новая статья',
         ]);
@@ -83,11 +84,11 @@ class JournalArticleController extends BaseController
             return $this->redirect(['update', 'id' => $model->id]);
         }
 
-        JournalArticleAsset::register($this->view);
+        JournalArticleMarkdownAsset::register($this->view);
 
         return $this->render('form', [
             'model' => $model,
-            'blocksForm' => $this->blocksFormForView($model),
+            'bodyMarkdown' => $this->bodyMarkdownForView($model),
             'recommendedForm' => $this->recommendedFormForView($model),
             'title' => 'Редактирование статьи',
         ]);
@@ -104,7 +105,15 @@ class JournalArticleController extends BaseController
             return false;
         }
 
-        $model->setBlocksArray(JournalArticleBlockBuilder::blocksFromPost($post));
+        $markdown = trim((string)($post['JournalArticle']['body_markdown'] ?? ''));
+        $model->body_markdown = $markdown;
+
+        $blocks = JournalArticleMarkdownParser::parse($markdown);
+        if ($blocks === []) {
+            $model->addError('body_markdown', 'Добавьте текст статьи в редакторе.');
+        } else {
+            $model->setBlocksArray($blocks);
+        }
 
         if (!$model->validate()) {
             return false;
@@ -123,22 +132,24 @@ class JournalArticleController extends BaseController
         return false;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function blocksFormForView(JournalArticle $model): array
+    private function bodyMarkdownForView(JournalArticle $model): string
     {
         if (Yii::$app->request->isPost) {
-            return JournalArticleBlockBuilder::blocksToForm(
-                JournalArticleBlockBuilder::blocksFromPost(Yii::$app->request->post())
-            );
+            $articlePost = Yii::$app->request->post('JournalArticle', []);
+
+            return trim((string)($articlePost['body_markdown'] ?? ''));
         }
 
-        if ($model->isNewRecord) {
-            return JournalArticleBlockBuilder::blocksToForm([]);
+        $stored = trim((string)$model->body_markdown);
+        if ($stored !== '') {
+            return $stored;
         }
 
-        return JournalArticleBlockBuilder::blocksToForm($model->getBlocksArray());
+        if (!$model->isNewRecord) {
+            return JournalArticleMarkdownSerializer::fromBlocks($model->getBlocksArray());
+        }
+
+        return '';
     }
 
     /**

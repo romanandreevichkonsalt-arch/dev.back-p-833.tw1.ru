@@ -39,7 +39,7 @@ class JournalArticle extends ActiveRecord
     {
         return [
             [['slug', 'category_id', 'title'], 'required'],
-            [['excerpt', 'seo_description', 'blocks'], 'string'],
+            [['excerpt', 'seo_description', 'blocks', 'body_markdown'], 'string'],
             [['slug'], 'string', 'max' => 128],
             [['slug'], 'unique'],
             [['category_id'], 'string', 'max' => 32],
@@ -70,6 +70,7 @@ class JournalArticle extends ActiveRecord
             'seo_title' => 'SEO title',
             'seo_description' => 'SEO description',
             'blocks' => 'Контент',
+            'body_markdown' => 'Текст статьи (Markdown)',
             'sort_order' => 'Порядок',
             'is_active' => 'Активна',
             'created_at' => 'Создана',
@@ -121,6 +122,10 @@ class JournalArticle extends ActiveRecord
     {
         if ($this->blocks === '' || $this->blocks === null) {
             $this->blocks = '[]';
+        }
+
+        if ($this->body_markdown === null) {
+            $this->body_markdown = '';
         }
 
         return parent::beforeSave($insert);
