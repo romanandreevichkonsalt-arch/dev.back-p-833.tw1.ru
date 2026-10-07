@@ -207,6 +207,10 @@ class LocalMediaStorage
             throw new \RuntimeException('Не удалось обновить запись медиафайла.');
         }
 
+        if ($media->isListingFrameLocked()) {
+            return (new ListingTileService($this))->reapplyLockedFrame($media);
+        }
+
         return $media;
     }
 
@@ -217,6 +221,8 @@ class LocalMediaStorage
             $media->path_large,
             $media->path_medium,
             $media->path_mini,
+            $media->path_listing_medium,
+            $media->path_listing_mini,
         ]);
         $media->delete();
     }

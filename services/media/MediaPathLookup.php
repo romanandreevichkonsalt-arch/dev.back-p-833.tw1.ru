@@ -35,6 +35,8 @@ class MediaPathLookup
                 ['path_large' => $path],
                 ['path_medium' => $path],
                 ['path_mini' => $path],
+                ['path_listing_medium' => $path],
+                ['path_listing_mini' => $path],
             ])
             ->one();
     }

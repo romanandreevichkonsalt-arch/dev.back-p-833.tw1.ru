@@ -42,7 +42,14 @@ class MediaFile extends ActiveRecord
         return [
             [['filename', 'path', 'mime', 'size', 'created_at', 'kind'], 'required'],
             [['filename'], 'string', 'max' => 255],
-            [['path', 'path_large', 'path_medium', 'path_mini'], 'string', 'max' => 512],
+            [[
+                'path',
+                'path_large',
+                'path_medium',
+                'path_mini',
+                'path_listing_medium',
+                'path_listing_mini',
+            ], 'string', 'max' => 512],
             [['path'], 'unique'],
             [['kind'], 'string', 'max' => 16],
             [['kind'], 'in', 'range' => array_keys(self::kindLabels())],
@@ -107,6 +114,58 @@ class MediaFile extends ActiveRecord
         ];
     }
 
+    public function hasListingTileVariants(): bool
+    {
+        return $this->isListingFrameLocked()
+            && trim((string)$this->path_listing_medium) !== '';
+    }
+
+    /**
+     * URL для листинга/поиска: кадр редактора, если есть; иначе авто-варианты.
+     *
+     * @return array{original:string,large:string,medium:string,mini:string}
+     */
+    public function getListingPublicUrls(): array
+    {
+        $urls = $this->getPublicUrls();
+        if (!$this->hasListingTileVariants()) {
+            return $urls;
+        }
+
+        $listingMedium = trim((string)$this->path_listing_medium);
+        if ($listingMedium !== '') {
+            $urls['medium'] = '/' . ltrim($listingMedium, '/');
+        }
+        $listingMini = trim((string)$this->path_listing_mini);
+        if ($listingMini !== '') {
+            $urls['mini'] = '/' . ltrim($listingMini, '/');
+        }
+
+        return $urls;
+    }
+
+    /**
+     * Оригинал без ресайза — для галереи карточки товара.
+     *
+     * @return array{original:string,large:string,medium:string,mini:string}
+     */
+    public function getProductDetailPublicUrls(): array
+    {
+        $urls = $this->getPublicUrls();
+        $urls['medium'] = $urls['original'];
+
+        return $urls;
+    }
+
+    public function getListingPreviewUrl(): string
+    {
+        if ($this->hasListingTileVariants()) {
+            return '/' . ltrim((string)$this->path_listing_medium, '/');
+        }
+
+        return $this->getPublicUrl('medium');
+    }
+
     /**
      * @return array{src:string,alt:string,srcSet?:array{mini:string,medium:string,large:string,original:string},width?:int,height?:int}
      */
@@ -128,7 +187,7 @@ class MediaFile extends ActiveRecord
     {
         return self::buildApiImagePayload(
             $this->isImage(),
-            $this->getPublicUrls(),
+            $this->getListingPublicUrls(),
             $alt ?? $this->alt ?? $this->filename,
             $this->width,
             $this->height,
@@ -139,8 +198,49 @@ class MediaFile extends ActiveRecord
     }
 
     /**
+     * Карточка товара / галерея модели: src и srcSet.medium — оригинал; mini — кадр каталога (если задан).
+     *
+     * @return array{src:string,alt:string,srcSet?:array{mini:string,medium:string,large?:string},width?:int,height?:int}
+     */
+    public function toProductDetailApiImagePayload(?string $alt = null, string $defaultSrc = 'medium'): array
+    {
+        return self::buildApiImagePayload(
+            $this->isImage(),
+            $this->getProductDetailPublicUrls(),
+            $alt ?? $this->alt ?? $this->filename,
+            $this->width,
+            $this->height,
+            $this->getPublicUrl(),
+            $defaultSrc,
+            false,
+            true
+        );
+    }
+
+    /**
+     * Ткани / материалы: mini, medium, large из медиатеки (те же лимиты, что у товара), без original в srcSet.
+     *
+     * @return array{src:string,alt:string,srcSet?:array{mini:string,medium:string,large?:string},width?:int,height?:int}
+     */
+    public function toMaterialApiImagePayload(?string $alt = null, string $defaultSrc = 'medium'): array
+    {
+        return self::buildApiImagePayload(
+            $this->isImage(),
+            $this->getPublicUrls(),
+            $alt ?? $this->alt ?? $this->filename,
+            $this->width,
+            $this->height,
+            $this->getPublicUrl(),
+            $defaultSrc,
+            false,
+            false,
+            true
+        );
+    }
+
+    /**
      * @param array{original:string,large?:string,medium:string,mini:string} $urls
-     * @return array{src:string,alt:string,srcSet?:array{mini:string,medium:string,large:string,original:string},width?:int,height?:int}
+     * @return array{src:string,alt:string,srcSet?:array{mini:string,medium:string,large?:string,original?:string},width?:int,height?:int}
      */
     public static function buildApiImagePayload(
         bool $isImage,
@@ -150,7 +250,9 @@ class MediaFile extends ActiveRecord
         ?int $height = null,
         ?string $nonImageSrc = null,
         string $defaultSrc = 'medium',
-        bool $forListing = false
+        bool $forListing = false,
+        bool $forProductDetail = false,
+        bool $forMaterial = false
     ): array {
         if (!$isImage) {
             return [
@@ -164,6 +266,14 @@ class MediaFile extends ActiveRecord
                 'mini' => $urls['mini'],
                 'medium' => $urls['medium'],
             ];
+        } elseif ($forProductDetail || $forMaterial) {
+            $srcSet = [
+                'mini' => $urls['mini'],
+                'medium' => $urls['medium'],
+            ];
+            if (($urls['large'] ?? '') !== '') {
+                $srcSet['large'] = $urls['large'];
+            }
         } else {
             $srcSet = [
                 'mini' => $urls['mini'],

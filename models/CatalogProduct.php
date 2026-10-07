@@ -286,7 +286,7 @@ class CatalogProduct extends ActiveRecord
     {
         $buildPayload = static fn (MediaFile $media, string $alt): array => $forListing
             ? $media->toListingApiImagePayload($alt)
-            : $media->toApiImagePayload($alt);
+            : $media->toProductDetailApiImagePayload($alt);
 
         if ($this->image !== null) {
             $payload = $buildPayload($this->image, $this->image->alt ?? $this->title);

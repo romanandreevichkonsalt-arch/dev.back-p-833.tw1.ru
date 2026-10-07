@@ -73,8 +73,19 @@ class MediaVariantRegenerator
             throw new \RuntimeException('Пересборка вариантов доступна только для изображений.');
         }
 
+        $media = $this->regenerateStandardVariants($media);
+
         if ($media->isListingFrameLocked()) {
             return (new ListingTileService($this->storage))->reapplyLockedFrame($media);
+        }
+
+        return $media;
+    }
+
+    public function regenerateStandardVariants(MediaFile $media): MediaFile
+    {
+        if (!$media->isImage()) {
+            throw new \RuntimeException('Пересборка вариантов доступна только для изображений.');
         }
 
         $fullPath = $this->storage->resolveFullPath($media->path);

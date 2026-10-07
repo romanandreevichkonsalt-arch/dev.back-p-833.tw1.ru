@@ -363,18 +363,17 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="CatalogImage",
  *     type="object",
- *     description="Изображение из медиатеки. В листинге и поиске src — medium (_m); srcSet.mini — для blur/placeholder. В карточке товара src — medium, полный srcSet с large/original. width/height в ответе есть, в примере опущены.",
+ *     description="Изображение из медиатеки. Листинг/поиск: src и srcSet.medium|mini — кадр редактора (_listing_m/_listing_s), авто _m/_s не трогаются. Карточка товара: src и srcSet.medium — оригинал (path) без ресайза; srcSet.mini — авто-миниатюра; original в srcSet не отдаётся. width/height в ответе есть, в примере опущены.",
  *     required={"src","alt"},
  *     example={
  *         "src"="медиатека · URL medium (до 1200px)",
  *         "alt"="медиатека · альтернативный текст",
  *         "srcSet"={
- *             "mini"="медиатека · URL миниатюры (до 200px)",
- *             "medium"="медиатека · URL medium (до 1200px)",
- *             "original"="медиатека · URL оригинала"
+ *             "mini"="медиатека · URL миниатюры кадра каталога (до 200px)",
+ *             "medium"="медиатека · URL оригинала (карточка товара) или кадра каталога (листинг)"
  *         }
  *     },
- *     @OA\Property(property="src", type="string", example="медиатека · URL medium (до 1200px)", title="URL medium", description="URL medium-варианта из медиатеки (max-width 1200px)"),
+ *     @OA\Property(property="src", type="string", example="медиатека · URL medium (до 1200px)", title="URL medium", description="листинг/поиск — кадр каталога; карточка товара — оригинал (в поле medium)"),
  *     @OA\Property(property="alt", type="string", example="медиатека · альтернативный текст", title="альтернативный текст", description="альтернативный текст изображения"),
  *     @OA\Property(
  *         property="srcSet",
@@ -407,7 +406,7 @@ use OpenApi\Annotations as OA;
  *                 "srcSet"={
  *                     "mini"="медиатека · URL миниатюры (до 200px)",
  *                     "medium"="медиатека · URL medium (до 1200px)",
- *                     "original"="медиатека · URL оригинала"
+ *                     "large"="медиатека · URL large (до 1920px)"
  *                 }
  *             }
  *         }

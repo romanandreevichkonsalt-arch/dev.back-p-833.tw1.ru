@@ -83,7 +83,7 @@ class CatalogLibraryFabricsService
                 ['fcol' => '{{%catalog_fabric_collections}}'],
                 'fcol.id = fc.fabric_collection_id AND fcol.is_active = 1'
             )
-            ->with(['fabricCollection', 'catalogColor', 'swatchMedia'])
+            ->with(['fabricCollection', 'catalogColor', 'swatchMedia', 'colorImages.media'])
             ->where(['fc.is_active' => true]);
 
         if ($q !== '') {

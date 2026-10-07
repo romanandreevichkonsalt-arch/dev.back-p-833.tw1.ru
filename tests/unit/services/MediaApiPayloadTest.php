@@ -59,6 +59,82 @@ class MediaApiPayloadTest extends Unit
         verify($payload['height'])->equals(600);
     }
 
+    public function testBuildListingApiImagePayloadPrefersListingMediumWhenProvided(): void
+    {
+        $payload = MediaFile::buildApiImagePayload(
+            true,
+            [
+                'original' => '/uploads/media/x/photo.jpg',
+                'large' => '/uploads/media/x/photo_l.webp',
+                'medium' => '/uploads/media/x/photo_listing_m.webp',
+                'mini' => '/uploads/media/x/photo_listing_s.webp',
+            ],
+            'Sample',
+            null,
+            null,
+            null,
+            'medium',
+            true
+        );
+
+        verify($payload['src'])->equals('/uploads/media/x/photo_listing_m.webp');
+        verify($payload['srcSet']['medium'])->equals('/uploads/media/x/photo_listing_m.webp');
+        verify($payload['srcSet']['mini'])->equals('/uploads/media/x/photo_listing_s.webp');
+    }
+
+    public function testBuildMaterialApiImagePayloadUsesDistinctVariantsWithoutOriginalKey(): void
+    {
+        $payload = MediaFile::buildApiImagePayload(
+            true,
+            [
+                'original' => '/uploads/media/fabrics/2026/08/sample.jpg',
+                'large' => '/uploads/media/fabrics/2026/08/sample_l.webp',
+                'medium' => '/uploads/media/fabrics/2026/08/sample_m.webp',
+                'mini' => '/uploads/media/fabrics/2026/08/sample_s.webp',
+            ],
+            'Swatch',
+            800,
+            600,
+            null,
+            'medium',
+            false,
+            false,
+            true
+        );
+
+        verify($payload['src'])->equals('/uploads/media/fabrics/2026/08/sample_m.webp');
+        verify($payload['srcSet']['mini'])->equals('/uploads/media/fabrics/2026/08/sample_s.webp');
+        verify($payload['srcSet']['medium'])->equals('/uploads/media/fabrics/2026/08/sample_m.webp');
+        verify($payload['srcSet']['large'])->equals('/uploads/media/fabrics/2026/08/sample_l.webp');
+        verify($payload['srcSet']['original'] ?? null)->null();
+    }
+
+    public function testBuildProductDetailApiImagePayloadUsesOriginalAsMediumWithoutOriginalKey(): void
+    {
+        $payload = MediaFile::buildApiImagePayload(
+            true,
+            [
+                'original' => '/uploads/media/fabrics/2026/08/sample.jpg',
+                'large' => '/uploads/media/fabrics/2026/08/sample_l.webp',
+                'medium' => '/uploads/media/fabrics/2026/08/sample.jpg',
+                'mini' => '/uploads/media/fabrics/2026/08/photo_s.webp',
+            ],
+            'Sample',
+            800,
+            600,
+            null,
+            'medium',
+            false,
+            true
+        );
+
+        verify($payload['src'])->equals('/uploads/media/fabrics/2026/08/sample.jpg');
+        verify($payload['srcSet']['medium'])->equals('/uploads/media/fabrics/2026/08/sample.jpg');
+        verify($payload['srcSet']['mini'])->equals('/uploads/media/fabrics/2026/08/photo_s.webp');
+        verify($payload['srcSet']['large'])->equals('/uploads/media/fabrics/2026/08/sample_l.webp');
+        verify($payload['srcSet']['original'] ?? null)->null();
+    }
+
     public function testResolveTreeExpandsMediaIdToPayload(): void
     {
         $resolver = new MediaUrlResolver();

@@ -278,14 +278,12 @@ class MediaController extends BaseController
                 $tileConfig->height,
             );
         }
-        $previewVariant = MediaContentValidator::resolveReadableVariant($media, 'medium') ?? 'original';
-
         return array_merge(
             $this->listingTileEditorBootstrap($service),
             [
                 'mediaId' => (int)$media->id,
                 'originalUrl' => $media->getPublicUrl('original'),
-                'previewUrl' => $media->getPublicUrl($previewVariant),
+                'previewUrl' => $media->getListingPreviewUrl(),
                 'locked' => $media->isListingFrameLocked(),
                 'frame' => $frame->toArray(),
             ],
@@ -356,11 +354,9 @@ class MediaController extends BaseController
             $media = $service->saveFrame($media, $frame);
             ApiCacheInvalidator::touch();
 
-            $previewVariant = MediaContentValidator::resolveReadableVariant($media, 'medium') ?? 'original';
-
             return [
                 'success' => true,
-                'previewUrl' => $media->getPublicUrl($previewVariant),
+                'previewUrl' => $media->getListingPreviewUrl(),
                 'locked' => $media->isListingFrameLocked(),
                 'frame' => $frame->toArray(),
             ];

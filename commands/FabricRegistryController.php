@@ -6,6 +6,7 @@ use app\services\catalog\FabricLibraryArchiveLauncher;
 use app\services\import\fabric\FabricRegistryImportOptions;
 use app\services\import\fabric\FabricRegistryImporter;
 use app\services\import\fabric\FabricRegistryImportRowResult;
+use app\services\media\FabricSwatchVariantRegenerator;
 use yii\console\Controller;
 use yii\console\ExitCode;
 
@@ -21,6 +22,9 @@ class FabricRegistryController extends Controller
         $options = array_merge(parent::options($actionID), ['dryRun', 'media', 'update']);
         if ($actionID === 'import') {
             $options[] = 'onConflict';
+        }
+        if ($actionID === 'regenerate-swatch-variants') {
+            $options[] = 'dryRun';
         }
 
         return $options;
@@ -93,6 +97,27 @@ class FabricRegistryController extends Controller
             $result['repaired'],
             $result['failed'],
             $result['skipped']
+        ));
+
+        foreach ($result['messages'] as $message) {
+            $this->stdout('  ' . $message . "\n");
+        }
+
+        return ($result['failed'] ?? 0) > 0 ? ExitCode::UNSPECIFIED_ERROR : ExitCode::OK;
+    }
+
+    public function actionRegenerateSwatchVariants(): int
+    {
+        $service = new FabricSwatchVariantRegenerator();
+        $result = $service->regenerateMissing($this->dryRun);
+
+        $this->stdout(sprintf(
+            "Fabric swatch variants: processed=%d regenerated=%d skipped=%d failed=%d%s\n",
+            $result['processed'],
+            $result['regenerated'],
+            $result['skipped'],
+            $result['failed'],
+            $this->dryRun ? ' (dry-run)' : ''
         ));
 
         foreach ($result['messages'] as $message) {

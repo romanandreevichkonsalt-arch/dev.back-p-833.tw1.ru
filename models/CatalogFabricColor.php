@@ -259,7 +259,7 @@ class CatalogFabricColor extends ActiveRecord
     {
         $swatches = [];
         if ($this->swatchMedia !== null) {
-            $swatches[] = $this->swatchMedia->toApiImagePayload(
+            $swatches[] = $this->swatchMedia->toMaterialApiImagePayload(
                 $this->swatchMedia->alt ?? $this->getProductColorLabel()
             );
         }
@@ -267,7 +267,7 @@ class CatalogFabricColor extends ActiveRecord
             if ($link->media === null) {
                 continue;
             }
-            $swatches[] = $link->media->toApiImagePayload($link->media->alt ?? $link->media->filename);
+            $swatches[] = $link->media->toMaterialApiImagePayload($link->media->alt ?? $link->media->filename);
         }
 
         return $swatches;

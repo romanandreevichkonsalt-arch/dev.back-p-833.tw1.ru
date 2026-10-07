@@ -32,8 +32,8 @@ final class ListingTileService
             throw new \RuntimeException('Оригинал не найден на диске.');
         }
 
-        $mediumPath = $this->resolveVariantFullPath($media, 'medium');
-        $miniPath = $this->resolveVariantFullPath($media, 'mini');
+        $mediumPath = $this->resolveListingVariantFullPath($media, 'medium');
+        $miniPath = $this->resolveListingVariantFullPath($media, 'mini');
 
         $this->renderer->renderFile($originalPath, $frame, $mediumPath);
 
@@ -45,9 +45,14 @@ final class ListingTileService
 
         $media->listing_frame_json = $frame->encodeJson();
         $media->listing_frame_locked = true;
-        $media->path_medium = $this->toRelativePath($mediumPath);
-        $media->path_mini = $this->toRelativePath($miniPath);
-        if (!$media->save(false, ['listing_frame_json', 'listing_frame_locked', 'path_medium', 'path_mini'])) {
+        $media->path_listing_medium = $this->toRelativePath($mediumPath);
+        $media->path_listing_mini = $this->toRelativePath($miniPath);
+        if (!$media->save(false, [
+            'listing_frame_json',
+            'listing_frame_locked',
+            'path_listing_medium',
+            'path_listing_mini',
+        ])) {
             throw new \RuntimeException('Не удалось сохранить параметры кадра.');
         }
 
@@ -69,9 +74,17 @@ final class ListingTileService
 
     public function clearLockedFrame(MediaFile $media): void
     {
+        $this->unlinkListingVariantPaths($media);
         $media->listing_frame_json = null;
         $media->listing_frame_locked = false;
-        $media->save(false, ['listing_frame_json', 'listing_frame_locked']);
+        $media->path_listing_medium = null;
+        $media->path_listing_mini = null;
+        $media->save(false, [
+            'listing_frame_json',
+            'listing_frame_locked',
+            'path_listing_medium',
+            'path_listing_mini',
+        ]);
     }
 
     /**
@@ -97,11 +110,11 @@ final class ListingTileService
         return $this->config;
     }
 
-    private function resolveVariantFullPath(MediaFile $media, string $variant): string
+    private function resolveListingVariantFullPath(MediaFile $media, string $variant): string
     {
         $relative = match ($variant) {
-            'medium' => $media->path_medium,
-            'mini' => $media->path_mini,
+            'medium' => $media->path_listing_medium,
+            'mini' => $media->path_listing_mini,
             default => null,
         };
 
@@ -110,7 +123,7 @@ final class ListingTileService
         }
 
         $basenameNoExt = pathinfo(basename($media->path), PATHINFO_FILENAME);
-        $suffix = $variant === 'mini' ? '_s' : '_m';
+        $suffix = $variant === 'mini' ? '_listing_s' : '_listing_m';
         $subdir = trim(str_replace(
             Yii::$app->params['mediaPublicPrefix'] ?? 'uploads/media',
             '',
@@ -122,6 +135,19 @@ final class ListingTileService
             . '/' . $filename;
 
         return $this->storage->resolveFullPath($relativePath);
+    }
+
+    private function unlinkListingVariantPaths(MediaFile $media): void
+    {
+        foreach ([$media->path_listing_medium, $media->path_listing_mini] as $relativePath) {
+            if ($relativePath === null || trim($relativePath) === '') {
+                continue;
+            }
+            $fullPath = $this->storage->resolveFullPath($relativePath);
+            if (is_file($fullPath)) {
+                @unlink($fullPath);
+            }
+        }
     }
 
     private function toRelativePath(string $fullPath): string

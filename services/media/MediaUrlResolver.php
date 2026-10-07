@@ -207,7 +207,14 @@ class MediaUrlResolver
         $media = $this->pathLookup->findByPublicPath($url);
         if ($media !== null) {
             $this->cacheMedia($media);
-            foreach ([$media->path, $media->path_large, $media->path_medium, $media->path_mini] as $variantPath) {
+            foreach ([
+                $media->path,
+                $media->path_large,
+                $media->path_medium,
+                $media->path_mini,
+                $media->path_listing_medium,
+                $media->path_listing_mini,
+            ] as $variantPath) {
                 if ($variantPath !== null && $variantPath !== '') {
                     $this->pathMediaCache[ltrim($variantPath, '/')] = $media;
                 }

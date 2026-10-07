@@ -69,6 +69,9 @@ final class SearchLiteIndexBuilder
                         'path_medium',
                         'path_mini',
                         'path_large',
+                        'path_listing_medium',
+                        'path_listing_mini',
+                        'listing_frame_locked',
                         'alt',
                         'filename',
                         'kind',
@@ -87,6 +90,9 @@ final class SearchLiteIndexBuilder
                         'path_medium',
                         'path_mini',
                         'path_large',
+                        'path_listing_medium',
+                        'path_listing_mini',
+                        'listing_frame_locked',
                         'alt',
                         'filename',
                         'kind',
@@ -145,6 +151,9 @@ final class SearchLiteIndexBuilder
                 'm.path_medium',
                 'm.path_mini',
                 'm.path_large',
+                'm.path_listing_medium',
+                'm.path_listing_mini',
+                'm.listing_frame_locked',
                 'm.alt',
                 'm.filename',
             ])
@@ -333,6 +342,21 @@ final class SearchLiteIndexBuilder
     }
 
     /**
+     * @param array<string, mixed> $image
+     */
+    private function resolveListingMediumPath(array $image): string
+    {
+        if (!empty($image['listing_frame_locked'])) {
+            $listing = trim((string)($image['path_listing_medium'] ?? ''));
+            if ($listing !== '') {
+                return $listing;
+            }
+        }
+
+        return trim((string)($image['path_medium'] ?? ''));
+    }
+
+    /**
      * @param array<string, mixed>|null $image
      * @return array{src: string|null, alt: string}
      */
@@ -342,7 +366,7 @@ final class SearchLiteIndexBuilder
             return MediaFile::emptyImagePayload($title);
         }
 
-        $path = trim((string)($image['path_medium'] ?? ''));
+        $path = $this->resolveListingMediumPath($image);
         if ($path === '') {
             $path = trim((string)($image['path_mini'] ?? ''));
         }

@@ -579,7 +579,7 @@ class CatalogModel extends ActiveRecord
 
             $alt = $link->media->alt ?? $link->media->filename;
 
-            return $link->media->toApiImagePayload($alt);
+            return $link->media->toProductDetailApiImagePayload($alt);
         }
 
         return null;
@@ -642,7 +642,7 @@ class CatalogModel extends ActiveRecord
             $alt = $link->media->alt ?? $link->media->filename;
             $images[] = $forListing
                 ? $link->media->toListingApiImagePayload($alt)
-                : $link->media->toApiImagePayload($alt);
+                : $link->media->toProductDetailApiImagePayload($alt);
         }
 
         return $images;
@@ -658,7 +658,7 @@ class CatalogModel extends ActiveRecord
             if ($link->media === null) {
                 continue;
             }
-            $images[] = $link->media->toApiImagePayload($link->media->alt ?? $link->media->filename);
+            $images[] = $link->media->toProductDetailApiImagePayload($link->media->alt ?? $link->media->filename);
         }
 
         return $images;
