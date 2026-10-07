@@ -363,17 +363,17 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="CatalogImage",
  *     type="object",
- *     description="Изображение из медиатеки. Листинг/поиск: src и srcSet.medium|mini — кадр редактора (_listing_m/_listing_s), авто _m/_s не трогаются. Карточка товара: src и srcSet.medium — оригинал (path) без ресайза; srcSet.mini — авто-миниатюра; original в srcSet не отдаётся. width/height в ответе есть, в примере опущены.",
+ *     description="Изображение из медиатеки. Листинг/поиск: src и srcSet.medium|mini — кадр редактора (_listing_m/_listing_s). Карточка товара: src и srcSet — auto mini/medium/large (_s/_m/_l), без кадра редактора; original в srcSet не отдаётся. width/height в ответе есть, в примере опущены.",
  *     required={"src","alt"},
  *     example={
  *         "src"="медиатека · URL medium (до 1200px)",
  *         "alt"="медиатека · альтернативный текст",
  *         "srcSet"={
  *             "mini"="медиатека · URL миниатюры кадра каталога (до 200px)",
- *             "medium"="медиатека · URL оригинала (карточка товара) или кадра каталога (листинг)"
+ *             "medium"="медиатека · URL medium (до 1200px) или кадра каталога (листинг)"
  *         }
  *     },
- *     @OA\Property(property="src", type="string", example="медиатека · URL medium (до 1200px)", title="URL medium", description="листинг/поиск — кадр каталога; карточка товара — оригинал (в поле medium)"),
+ *     @OA\Property(property="src", type="string", example="медиатека · URL medium (до 1200px)", title="URL medium", description="листинг/поиск — кадр каталога; карточка товара — auto _m"),
  *     @OA\Property(property="alt", type="string", example="медиатека · альтернативный текст", title="альтернативный текст", description="альтернативный текст изображения"),
  *     @OA\Property(
  *         property="srcSet",

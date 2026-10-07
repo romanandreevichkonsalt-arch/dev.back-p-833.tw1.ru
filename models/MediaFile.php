@@ -145,16 +145,13 @@ class MediaFile extends ActiveRecord
     }
 
     /**
-     * Оригинал без ресайза — для галереи карточки товара.
+     * Карточка товара: auto mini/medium/large (path_*), без кадра редактора и без original в API.
      *
      * @return array{original:string,large:string,medium:string,mini:string}
      */
     public function getProductDetailPublicUrls(): array
     {
-        $urls = $this->getPublicUrls();
-        $urls['medium'] = $urls['original'];
-
-        return $urls;
+        return $this->getPublicUrls();
     }
 
     public function getListingPreviewUrl(): string
@@ -198,7 +195,7 @@ class MediaFile extends ActiveRecord
     }
 
     /**
-     * Карточка товара / галерея модели: src и srcSet.medium — оригинал; mini — кадр каталога (если задан).
+     * Карточка товара / галерея модели: src и srcSet.medium — auto _m (без кадра редактора).
      *
      * @return array{src:string,alt:string,srcSet?:array{mini:string,medium:string,large?:string},width?:int,height?:int}
      */

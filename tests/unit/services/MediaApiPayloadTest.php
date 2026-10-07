@@ -109,14 +109,14 @@ class MediaApiPayloadTest extends Unit
         verify($payload['srcSet']['original'] ?? null)->null();
     }
 
-    public function testBuildProductDetailApiImagePayloadUsesOriginalAsMediumWithoutOriginalKey(): void
+    public function testBuildProductDetailApiImagePayloadUsesAutoMediumWithoutOriginalKey(): void
     {
         $payload = MediaFile::buildApiImagePayload(
             true,
             [
                 'original' => '/uploads/media/fabrics/2026/08/sample.jpg',
                 'large' => '/uploads/media/fabrics/2026/08/sample_l.webp',
-                'medium' => '/uploads/media/fabrics/2026/08/sample.jpg',
+                'medium' => '/uploads/media/fabrics/2026/08/sample_m.webp',
                 'mini' => '/uploads/media/fabrics/2026/08/photo_s.webp',
             ],
             'Sample',
@@ -128,8 +128,8 @@ class MediaApiPayloadTest extends Unit
             true
         );
 
-        verify($payload['src'])->equals('/uploads/media/fabrics/2026/08/sample.jpg');
-        verify($payload['srcSet']['medium'])->equals('/uploads/media/fabrics/2026/08/sample.jpg');
+        verify($payload['src'])->equals('/uploads/media/fabrics/2026/08/sample_m.webp');
+        verify($payload['srcSet']['medium'])->equals('/uploads/media/fabrics/2026/08/sample_m.webp');
         verify($payload['srcSet']['mini'])->equals('/uploads/media/fabrics/2026/08/photo_s.webp');
         verify($payload['srcSet']['large'])->equals('/uploads/media/fabrics/2026/08/sample_l.webp');
         verify($payload['srcSet']['original'] ?? null)->null();
