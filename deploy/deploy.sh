@@ -59,6 +59,9 @@ rsync_ssh() {
 RSYNC_EXCLUDES=(
   --filter='P config/db.php'
   --exclude='.git'
+  --exclude='.idea/'
+  --exclude='.supercode/'
+  --exclude='.cursor/'
   --exclude='.env'
   --exclude='.env.*'
   --exclude='config/db.php'
