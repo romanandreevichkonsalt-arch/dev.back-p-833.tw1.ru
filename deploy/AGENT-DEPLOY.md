@@ -1,7 +1,7 @@
 # Деплой back-dev — инструкция для агента
 
 Dev: **https://dev.back-p-833.tw1.ru**  
-SSH: `dev_back_p_8_usr@5.129.203.254` (тот же IP, что у `dev.back-p-833.tw1.ru`).
+SSH: `dev_back_p_8_usr@200.165.224.88` (тот же IP, что у `dev.back-p-833.tw1.ru`).
 
 Скрипт: `./deploy/deploy.sh` из **корня репозитория**.  
 Cursor-skill: `.cursor/skills/back-dev-deploy/SKILL.md` (краткая выжимка + когда какой режим).
@@ -84,7 +84,7 @@ curl -sS "https://dev.back-p-833.tw1.ru/swagger/json-schema" | head -c 200
 ## Переменные (обычно не нужны)
 
 ```bash
-SSH_HOST=5.129.203.254
+SSH_HOST=200.165.224.88
 SSH_USER=dev_back_p_8_usr
 SITE_DOMAIN=dev.back-p-833.tw1.ru
 ```

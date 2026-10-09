@@ -10,7 +10,7 @@ description: >-
 
 **Полная инструкция (SSH, ASKPASS, retry):** [deploy/AGENT-DEPLOY.md](../../../deploy/AGENT-DEPLOY.md) — читать перед деплоем.
 
-Dev: **https://dev.back-p-833.tw1.ru** · SSH: `dev_back_p_8_usr@5.129.203.254`
+Dev: **https://dev.back-p-833.tw1.ru** · SSH: `dev_back_p_8_usr@200.165.224.88`
 
 ## SSH (локально)
 

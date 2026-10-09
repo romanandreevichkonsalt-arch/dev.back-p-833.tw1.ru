@@ -24,7 +24,7 @@ case "$MODE" in
     ;;
 esac
 
-SSH_HOST="${SSH_HOST:-5.129.203.254}"
+SSH_HOST="${SSH_HOST:-200.165.224.88}"
 SSH_USER="${SSH_USER:-dev_back_p_8_usr}"
 SITE_DOMAIN="${SITE_DOMAIN:-dev.back-p-833.tw1.ru}"
 DEPLOY_BASE="${DEPLOY_BASE:-/var/www/dev_back_p_8_usr/data}"
