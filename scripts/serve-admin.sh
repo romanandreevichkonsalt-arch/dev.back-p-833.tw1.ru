@@ -11,6 +11,9 @@ if ! php yii migrate/up --interactive=0 2>&1; then
   exit 1
 fi
 
-echo "Админка: http://${HOST}:${PORT}/admin/site/login"
+echo "Админка: http://127.0.0.1:${PORT}/admin/site/login"
+if [[ "${HOST}" != "127.0.0.1" && "${HOST}" != "localhost" ]]; then
+  echo "Слушает: http://${HOST}:${PORT}/ (в браузере используйте 127.0.0.1)"
+fi
 echo "Остановка: Ctrl+C"
 exec php yii serve "${HOST}:${PORT}" -r web/router.php

@@ -148,6 +148,13 @@
         });
     }
 
+    function repeatableTemplate(section) {
+        if (!section) {
+            return null;
+        }
+        return section.querySelector(':scope > template[data-repeatable-template]');
+    }
+
     function initRepeatable(section) {
         if (!section || section.dataset.repeatableInit === '1') {
             return;
@@ -155,11 +162,11 @@
         section.dataset.repeatableInit = '1';
 
         var list = section.querySelector('[data-repeatable-list]');
-        var template = section.querySelector('template[data-repeatable-template]');
+        var template = repeatableTemplate(section);
         var addBtn = section.querySelector('[data-repeatable-add]');
 
         if (list) {
-            list.querySelectorAll('[data-repeatable-item]').forEach(function (item, index) {
+            list.querySelectorAll(':scope > [data-repeatable-item]').forEach(function (item, index) {
                 item.dataset.itemIndex = String(index);
                 initItem(item);
             });
@@ -168,7 +175,7 @@
 
         if (addBtn && list && template) {
             addBtn.addEventListener('click', function () {
-                var index = list.querySelectorAll('[data-repeatable-item]').length;
+                var index = list.querySelectorAll(':scope > [data-repeatable-item]').length;
                 var parentIndex = section.dataset.parentIndex || '';
                 var itemIndex = getItemIndex(section);
                 var html = template.innerHTML
