@@ -26,7 +26,7 @@ use OpenApi\Annotations as OA;
  *
  * @OA\Tag(
  *     name="Каталог",
- *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — ткани для страницы библиотеки (рекомендуемые по position_number, затем по алфавиту); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
+ *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — только рекомендуемые ткани для страницы библиотеки (сортировка по position_number); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
  * )
  *
  * @OA\Tag(

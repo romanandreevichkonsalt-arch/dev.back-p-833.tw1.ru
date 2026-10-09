@@ -84,7 +84,7 @@ class CatalogLibraryFabricsService
                 'fcol.id = fc.fabric_collection_id AND fcol.is_active = 1'
             )
             ->with(['fabricCollection', 'catalogColor', 'swatchMedia', 'colorImages.media'])
-            ->where(['fc.is_active' => true]);
+            ->where(['fc.is_active' => true, 'fc.is_recommended_fabric' => true]);
 
         if ($q !== '') {
             $query->andWhere([
@@ -112,11 +112,7 @@ class CatalogLibraryFabricsService
     private function applyLibrarySort(ActiveQuery $query): void
     {
         $query->orderBy([
-            new Expression('CASE WHEN [[fc]].[[is_recommended_fabric]] = 1 THEN 0 ELSE 1 END'),
-            new Expression(
-                'CASE WHEN [[fc]].[[is_recommended_fabric]] = 1'
-                . ' THEN COALESCE([[fc]].[[position_number]], 2147483647) ELSE 0 END'
-            ),
+            new Expression('COALESCE([[fc]].[[position_number]], 2147483647)'),
             new Expression('COALESCE(NULLIF([[fc]].[[api_label]], \'\'), [[fc]].[[design_code]])'),
             'fc.id' => SORT_ASC,
         ]);
