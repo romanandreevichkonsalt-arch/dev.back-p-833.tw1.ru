@@ -22,6 +22,7 @@ $mediaHostId = 'journal-article-markdown-media';
         Заголовки: <code>##</code> / <code>###</code>, цитата: строки с <code>&gt;</code>, разделитель: <code>---</code>,
         галерея: <code>::: gallery columns=2</code> … <code>:::</code>, подпись к фото — строка <code>*курсив*</code> под картинкой.
         Размер фото: при вставке через «Фото» или вручную <code>ID#large</code> / <code>ID#original</code> (по умолчанию — medium).
+        Высоту редактора можно изменить, потянув полоску под полем ввода (сохраняется до закрытия вкладки).
     </p>
 
     <div

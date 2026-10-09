@@ -1,24 +1,96 @@
 .admin-journal-markdown .EasyMDEContainer {
-    border-radius: var(--admin-radius-md, 8px);
+    border-radius: var(--admin-radius-md, 8px) var(--admin-radius-md, 8px) 0 0;
     overflow: hidden;
 }
 
+.admin-journal-markdown__resize {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 14px;
+    margin: 0;
+    cursor: ns-resize;
+    user-select: none;
+    touch-action: none;
+    background: var(--admin-surface-muted, #f3f4f6);
+    border: 1px solid var(--admin-border, #e5e7eb);
+    border-top: none;
+    border-radius: 0 0 var(--admin-radius-md, 8px) var(--admin-radius-md, 8px);
+}
+
+.admin-journal-markdown__resize-grip {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--admin-border-strong, #c5cad3);
+}
+
+.admin-journal-markdown__resize:hover .admin-journal-markdown__resize-grip,
+.admin-journal-markdown__resize:focus-visible .admin-journal-markdown__resize-grip {
+    background: var(--admin-text-muted, #6b7280);
+}
+
+body.admin-journal-markdown--resizing {
+    cursor: ns-resize !important;
+    user-select: none;
+}
+
 .admin-journal-markdown .CodeMirror {
-    min-height: 360px;
+    min-height: 200px;
+    height: var(--admin-journal-markdown-editor-max-height, 420px) !important;
+    max-height: var(--admin-journal-markdown-editor-max-height, 420px);
     font-size: 14px;
     line-height: 1.55;
+}
+
+.admin-journal-markdown .CodeMirror-scroll {
+    max-height: var(--admin-journal-markdown-editor-max-height, 420px);
+    overflow-y: auto !important;
+}
+
+.admin-journal-markdown .editor-preview-side,
+.admin-journal-markdown .editor-preview-full {
+    max-height: var(--admin-journal-markdown-editor-max-height, 420px);
+    overflow-y: auto;
 }
 
 .admin-journal-markdown .editor-preview-side {
     padding: 16px 20px;
 }
 
+/* EasyMDE previewImagesInEditor: фон на span[data-img-src]::after, не <img> */
+.admin-journal-markdown .CodeMirror span[data-img-src] {
+    display: block;
+    max-width: min(696px, 100%);
+}
+
+.admin-journal-markdown .CodeMirror span[data-img-src]::after {
+    content: '';
+    display: block;
+    width: min(696px, 100%) !important;
+    max-width: 696px;
+    height: 400px !important;
+    padding-top: 0 !important;
+    margin: 12px 0;
+    background-image: var(--bg-image);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+    border-radius: var(--admin-radius-md, 8px);
+}
+
+.admin-journal-markdown .editor-preview img,
 .admin-journal-markdown .editor-preview-side img,
 .admin-journal-markdown .editor-preview-full img {
-    max-width: 100%;
-    height: auto;
     display: block;
+    width: min(696px, 100%);
+    max-width: 696px;
+    height: 400px;
+    object-fit: cover;
+    object-position: center;
     margin: 12px 0;
+    border-radius: var(--admin-radius-md, 8px);
 }
 
 .admin-journal-markdown__hint {

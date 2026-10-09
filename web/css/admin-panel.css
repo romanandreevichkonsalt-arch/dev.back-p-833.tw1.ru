@@ -5456,17 +5456,21 @@ button.admin-page-tabs__link {
     margin-top: 8px;
 }
 
+.admin-journal-form__meta-row {
+    align-items: start;
+}
+
+.admin-journal-form__meta-row .form-group {
+    margin-bottom: 16px;
+}
+
+.admin-journal-form__meta-row .checkbox {
+    margin-top: 28px;
+}
+
 .admin-journal-form__sidebar .admin-media-picker--compact .admin-media-picker__preview {
     max-width: 100%;
     max-height: 140px;
-}
-
-.admin-journal-form__seo {
-    margin-top: 24px;
-}
-
-.admin-journal-form__seo .admin-form-section-title {
-    margin-bottom: 12px;
 }
 
 .admin-journal-blocks__fab {

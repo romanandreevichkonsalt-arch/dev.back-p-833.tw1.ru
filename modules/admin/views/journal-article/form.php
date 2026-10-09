@@ -41,9 +41,15 @@ $journalPageId = ContentPage::find()->select('id')->where(['slug' => 'journal'])
                             <?= $form->field($model, 'title')->textInput() ?>
                             <?= AdminHtml::slugField($form, $model, 'title') ?>
                             <?= $form->field($model, 'date')->textInput(['placeholder' => '07.10.2025']) ?>
-                            <?= $form->field($model, 'is_active')->checkbox() ?>
                         </div>
-                        <?= $form->field($model, 'excerpt')->textarea(['rows' => 2]) ?>
+                        <div class="admin-form-grid admin-journal-form__meta-row">
+                            <?= $form->field($model, 'is_active')->checkbox() ?>
+                            <?= $form->field($model, 'seo_title')->textInput() ?>
+                        </div>
+                        <div class="admin-form-grid admin-journal-form__meta-row">
+                            <?= $form->field($model, 'excerpt')->textarea(['rows' => 2]) ?>
+                            <?= $form->field($model, 'seo_description')->textarea(['rows' => 2]) ?>
+                        </div>
                     </div>
 
                     <div class="col-12 col-lg-5 admin-journal-form__sidebar">
@@ -56,12 +62,6 @@ $journalPageId = ContentPage::find()->select('id')->where(['slug' => 'journal'])
                             'allowClear' => true,
                             'compact' => true,
                         ]) ?>
-
-                        <div class="admin-journal-form__seo">
-                            <h3 class="admin-form-section-title">SEO</h3>
-                            <?= $form->field($model, 'seo_title')->textInput() ?>
-                            <?= $form->field($model, 'seo_description')->textarea(['rows' => 3]) ?>
-                        </div>
                     </div>
                 </div>
             </div>

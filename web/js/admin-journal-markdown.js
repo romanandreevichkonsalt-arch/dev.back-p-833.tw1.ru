@@ -246,6 +246,139 @@
         ];
     }
 
+    var EDITOR_HEIGHT_KEY = 'adminJournalMarkdownEditorHeight';
+    var EDITOR_HEIGHT_DEFAULT = 420;
+    var EDITOR_HEIGHT_MIN = 200;
+    var EDITOR_HEIGHT_MAX_FALLBACK = 900;
+
+    function editorHeightBounds() {
+        return {
+            min: EDITOR_HEIGHT_MIN,
+            max: Math.max(EDITOR_HEIGHT_MIN + 80, Math.min(EDITOR_HEIGHT_MAX_FALLBACK, window.innerHeight - 160)),
+        };
+    }
+
+    function clampEditorHeight(value) {
+        var bounds = editorHeightBounds();
+        var height = parseInt(String(value), 10);
+        if (isNaN(height)) {
+            height = EDITOR_HEIGHT_DEFAULT;
+        }
+
+        return Math.min(bounds.max, Math.max(bounds.min, height));
+    }
+
+    function readStoredEditorHeight() {
+        try {
+            return clampEditorHeight(sessionStorage.getItem(EDITOR_HEIGHT_KEY));
+        } catch (e) {
+            return EDITOR_HEIGHT_DEFAULT;
+        }
+    }
+
+    function storeEditorHeight(height) {
+        try {
+            sessionStorage.setItem(EDITOR_HEIGHT_KEY, String(height));
+        } catch (e) {
+            // ignore quota / private mode
+        }
+    }
+
+    function applyEditorHeight(root, easymde, height) {
+        height = clampEditorHeight(height);
+        root.style.setProperty('--admin-journal-markdown-editor-max-height', height + 'px');
+
+        if (easymde && easymde.codemirror) {
+            easymde.codemirror.setSize(null, height);
+            window.setTimeout(function () {
+                easymde.codemirror.refresh();
+            }, 0);
+        }
+
+        storeEditorHeight(height);
+    }
+
+    function ensureEditorResizeHandle(root) {
+        if (root.querySelector('[data-journal-markdown-resize]')) {
+            return root.querySelector('[data-journal-markdown-resize]');
+        }
+
+        var container = root.querySelector('.EasyMDEContainer');
+        if (!container) {
+            return null;
+        }
+
+        var resizeEl = document.createElement('div');
+        resizeEl.className = 'admin-journal-markdown__resize';
+        resizeEl.setAttribute('data-journal-markdown-resize', '');
+        resizeEl.setAttribute('role', 'separator');
+        resizeEl.setAttribute('aria-orientation', 'horizontal');
+        resizeEl.setAttribute('aria-label', 'Изменить высоту редактора');
+        resizeEl.setAttribute('title', 'Потяните, чтобы изменить высоту редактора');
+        resizeEl.innerHTML = '<span class="admin-journal-markdown__resize-grip" aria-hidden="true"></span>';
+        container.insertAdjacentElement('afterend', resizeEl);
+
+        return resizeEl;
+    }
+
+    function initEditorResize(root, easymde) {
+        var handle = ensureEditorResizeHandle(root);
+        if (!handle || handle.dataset.journalMarkdownResizeInit === '1') {
+            if (handle) {
+                applyEditorHeight(root, easymde, readStoredEditorHeight());
+            }
+            return;
+        }
+
+        handle.dataset.journalMarkdownResizeInit = '1';
+        applyEditorHeight(root, easymde, readStoredEditorHeight());
+
+        var dragging = false;
+        var startY = 0;
+        var startHeight = 0;
+
+        function onPointerMove(event) {
+            if (!dragging) {
+                return;
+            }
+
+            var delta = event.clientY - startY;
+            applyEditorHeight(root, easymde, startHeight + delta);
+        }
+
+        function stopDrag() {
+            if (!dragging) {
+                return;
+            }
+
+            dragging = false;
+            document.body.classList.remove('admin-journal-markdown--resizing');
+            document.removeEventListener('mousemove', onPointerMove);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        handle.addEventListener('mousedown', function (event) {
+            if (event.button !== 0) {
+                return;
+            }
+
+            event.preventDefault();
+            dragging = true;
+            startY = event.clientY;
+            startHeight = clampEditorHeight(
+                root.style.getPropertyValue('--admin-journal-markdown-editor-max-height').replace('px', '')
+                    || readStoredEditorHeight()
+            );
+            document.body.classList.add('admin-journal-markdown--resizing');
+            document.addEventListener('mousemove', onPointerMove);
+            document.addEventListener('mouseup', stopDrag);
+        });
+
+        window.addEventListener('resize', function () {
+            applyEditorHeight(root, easymde, readStoredEditorHeight());
+        });
+    }
+
     function initEditor(root) {
         if (root.dataset.journalMarkdownInit === '1') {
             return;
@@ -274,6 +407,8 @@
             },
             toolbar: buildToolbar(root),
         });
+
+        initEditorResize(root, easymde);
     }
 
     document.querySelectorAll('[data-journal-markdown-editor]').forEach(initEditor);
