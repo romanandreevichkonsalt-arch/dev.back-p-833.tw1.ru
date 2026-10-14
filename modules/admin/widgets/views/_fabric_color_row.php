@@ -10,7 +10,7 @@ use yii\helpers\Html;
 $productCount = $productCount ?? 0;
 $colorLabel = $link->catalogColor?->label ?? '—';
 $swatchHtml = $link->getSwatchPreviewUrl() !== null
-    ? Html::img($link->getSwatchPreviewUrl(), ['class' => 'admin-fabric-colors__thumb', 'alt' => ''])
+    ? Html::img($link->getSwatchPreviewUrl(), ['class' => 'admin-fabric-colors__thumb', 'alt' => '', 'loading' => 'lazy', 'decoding' => 'async'])
     : Html::tag('span', '—', ['class' => 'admin-muted']);
 ?>
 <tr

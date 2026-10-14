@@ -86,9 +86,12 @@
         }
 
         function applyMediaItem(item) {
+            var preferMini = root.classList.contains('admin-media-picker--compact');
             var displayUrl = isDocument
                 ? item.url
-                : (item.urls && item.urls.medium ? item.urls.medium : item.url);
+                : (preferMini && item.urls && item.urls.mini
+                    ? item.urls.mini
+                    : (item.urls && item.urls.medium ? item.urls.medium : item.url));
             var displayName = isDocument ? (item.filename || '') : '';
             valueInput.value = mode === 'id' ? String(item.id) : displayUrl;
             if (altInput && item.alt) {

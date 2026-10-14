@@ -39,7 +39,7 @@
 
     function buildSwatchHtml(mediaId, previewUrl) {
         if (previewUrl) {
-            return '<img class="admin-fabric-colors__thumb" src="' + previewUrl.replace(/"/g, '&quot;') + '" alt="">';
+            return '<img class="admin-fabric-colors__thumb" src="' + previewUrl.replace(/"/g, '&quot;') + '" alt="" loading="lazy" decoding="async">';
         }
         return mediaId ? '<span class="admin-muted">#'.concat(mediaId, '</span>') : '<span class="admin-muted">—</span>';
     }

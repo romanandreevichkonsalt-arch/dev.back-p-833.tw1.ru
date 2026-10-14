@@ -54,7 +54,7 @@ class MediaPickerWidget extends Widget
 
             $media = ctype_digit($pickerValue) ? MediaFile::findOne((int)$pickerValue) : null;
             if ($media !== null) {
-                $previewUrl = $media->getPublicUrl('large');
+                $previewUrl = $media->getPublicUrl($this->compact ? 'mini' : 'large');
                 $previewAlt = $media->alt ?? $previewAlt;
                 $previewMime = $media->mime;
             } elseif ($pickerValue !== '' && str_starts_with($pickerValue, '/')) {

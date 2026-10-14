@@ -302,13 +302,14 @@ class CatalogFabricColor extends ActiveRecord
         return $description !== '' ? $description : null;
     }
 
+    /** URL миниатюры для таблицы в админке (40×40), не original. */
     public function getSwatchPreviewUrl(): ?string
     {
         if ($this->swatchMedia !== null) {
-            return $this->swatchMedia->getPublicUrl();
+            return $this->swatchMedia->getPublicUrl('mini');
         }
 
-        return $this->catalogColor?->swatchMedia?->getPublicUrl();
+        return $this->catalogColor?->swatchMedia?->getPublicUrl('mini');
     }
 
     public function getSwatchCircleStyle(): string
