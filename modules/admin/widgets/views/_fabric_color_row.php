@@ -32,7 +32,7 @@ $swatchHtml = $link->getSwatchPreviewUrl() !== null
         <textarea
             name="fabric_color_links[<?= Html::encode($rowKey) ?>][description]"
             class="admin-fabric-colors__description-store"
-            aria-hidden="true"
+            hidden
             tabindex="-1"
         ><?= Html::encode((string)($link->description ?? '')) ?></textarea>
         <input type="hidden" name="fabric_color_links[<?= Html::encode($rowKey) ?>][is_active]" value="1">

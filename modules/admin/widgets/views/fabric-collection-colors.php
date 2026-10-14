@@ -118,7 +118,7 @@ $productCountByColorId = $productCountByColorId ?? [];
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][design_code]" value="__DESIGN_CODE__">
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][color_id]" value="__COLOR_ID__">
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][swatch_media_id]" value="__SWATCH_MEDIA_ID__">
-                <textarea name="fabric_color_links[__ROW_KEY__][description]" class="admin-fabric-colors__description-store" aria-hidden="true" tabindex="-1"></textarea>
+                <textarea name="fabric_color_links[__ROW_KEY__][description]" class="admin-fabric-colors__description-store" hidden tabindex="-1"></textarea>
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][is_active]" value="1">
             </td>
             <td data-fabric-color-display-label>__COLOR_LABEL__</td>

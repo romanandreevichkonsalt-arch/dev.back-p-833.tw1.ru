@@ -99,6 +99,45 @@
         document.body.classList.remove('admin-modal-open');
     }
 
+    function updateExistingRow(existing, payload, colorSelect) {
+        var colorLabel = getColorLabel(colorSelect, payload.colorId);
+        var swatchHtml = buildSwatchHtml(payload.swatchMediaId, payload.swatchPreviewUrl);
+
+        existing.setAttribute('data-design-code', payload.designCode);
+        existing.setAttribute('data-color-id', payload.colorId || '');
+        existing.setAttribute('data-swatch-media-id', payload.swatchMediaId || '');
+        existing.setAttribute('data-swatch-url', payload.swatchPreviewUrl || '');
+
+        var codeDisplay = existing.querySelector('[data-fabric-color-display-code]');
+        if (codeDisplay) {
+            codeDisplay.textContent = payload.designCode;
+        }
+        var designInput = existing.querySelector('[name*="[design_code]"]');
+        if (designInput) {
+            designInput.value = payload.designCode;
+        }
+        var colorInput = existing.querySelector('[name*="[color_id]"]');
+        if (colorInput) {
+            colorInput.value = payload.colorId || '';
+        }
+        var swatchInput = existing.querySelector('[name*="[swatch_media_id]"]');
+        if (swatchInput) {
+            swatchInput.value = payload.swatchMediaId || '';
+        }
+        var labelCell = existing.querySelector('[data-fabric-color-display-label]');
+        if (labelCell) {
+            labelCell.textContent = colorLabel;
+        }
+        var swatchCell = existing.querySelector('[data-fabric-color-display-swatch]');
+        if (swatchCell) {
+            swatchCell.innerHTML = swatchHtml;
+        }
+        var descriptionField = existing.querySelector('[name*="[description]"]');
+        if (descriptionField) {
+            descriptionField.value = payload.description || '';
+        }
+    }
+
     function upsertRow(section, payload) {
         var tbody = section.querySelector('[data-fabric-color-rows]');
         var template = document.getElementById('admin-fabric-color-row-template');
@@ -108,6 +147,12 @@
         }
 
         var existing = payload.rowKey ? tbody.querySelector('[data-row-key="' + payload.rowKey + '"]') : null;
+        if (existing) {
+            updateExistingRow(existing, payload, colorSelect);
+            updateEmptyState(section);
+            return;
+        }
+
         var rowKey = payload.rowKey || ('new_' + Date.now());
         var colorLabel = getColorLabel(colorSelect, payload.colorId);
         var swatchHtml = buildSwatchHtml(payload.swatchMediaId, payload.swatchPreviewUrl);
@@ -146,11 +191,7 @@
             descriptionField.value = payload.description || '';
         }
 
-        if (existing) {
-            existing.replaceWith(newRow);
-        } else {
-            tbody.appendChild(newRow);
-        }
+        tbody.appendChild(newRow);
 
         updateEmptyState(section);
     }
@@ -224,11 +265,8 @@
                 var previewImg = modal.querySelector('[data-fabric-color-modal-picker] .admin-media-picker__preview img');
                 var swatchPreviewUrl = previewImg ? previewImg.getAttribute('src') : '';
                 var editRow = rowKey ? tbody?.querySelector('[data-row-key="' + rowKey + '"]') : null;
-                var recommendedCheckbox = editRow?.querySelector('[name*="[is_recommended_fabric]"][type="checkbox"]');
-                var positionInput = editRow?.querySelector('[name*="[position_number]"]');
                 var description = modal.querySelector('[data-fabric-color-description]')?.value || '';
-
-                upsertRow(section, {
+                var payload = {
                     rowKey: rowKey,
                     linkId: modal.querySelector('[data-fabric-color-edit-id]')?.value || '',
                     designCode: designCode,
@@ -236,9 +274,17 @@
                     swatchMediaId: swatchMediaId,
                     swatchPreviewUrl: swatchPreviewUrl,
                     description: description,
-                    isRecommendedFabric: recommendedCheckbox ? recommendedCheckbox.checked : false,
-                    positionNumber: positionInput ? positionInput.value : '',
-                });
+                };
+
+                if (editRow) {
+                    updateExistingRow(editRow, payload, section.querySelector('[data-fabric-color-catalog-color]'));
+                    updateEmptyState(section);
+                } else {
+                    upsertRow(section, Object.assign(payload, {
+                        isRecommendedFabric: false,
+                        positionNumber: '',
+                    }));
+                }
 
                 closeModal(section);
             });

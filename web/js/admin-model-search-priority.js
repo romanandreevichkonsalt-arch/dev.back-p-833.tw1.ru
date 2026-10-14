@@ -25,6 +25,33 @@
         );
     }
 
+    /** После lazy-load блока ткани восстановить галочку по скрытым полям формы. */
+    function resolveActiveVariant(root) {
+        var fromDom = activeVariant(root);
+        if (fromDom) {
+            return fromDom;
+        }
+
+        var productHidden = priorityProductInput(root);
+        var productId = productHidden ? String(productHidden.value || '').trim() : '';
+        if (productId === '') {
+            return null;
+        }
+
+        var match = variantRows(root).find(function (row) {
+            return String(row.getAttribute('data-product-id') || '') === productId;
+        });
+        if (!match) {
+            return null;
+        }
+
+        root.querySelectorAll('[data-search-priority-check]').forEach(function (input) {
+            input.checked = input.closest('[data-search-priority-variant]') === match;
+        });
+
+        return match;
+    }
+
     function syncHiddenFields(root, clearWhenInactive) {
         var productHidden = priorityProductInput(root);
         var sortHidden = prioritySortInput(root);
@@ -83,7 +110,7 @@
         }
         root.dataset.searchPriorityInit = '1';
 
-        syncVariantUi(root, activeVariant(root), false);
+        syncVariantUi(root, resolveActiveVariant(root), false);
 
         root.addEventListener('change', function (event) {
             var target = event.target;
@@ -138,6 +165,6 @@
         if (!root) {
             return;
         }
-        syncVariantUi(root, activeVariant(root), false);
+        syncVariantUi(root, resolveActiveVariant(root), false);
     };
 })();
