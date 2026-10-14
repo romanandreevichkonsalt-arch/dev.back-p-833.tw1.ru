@@ -66,7 +66,7 @@
                     '</svg>' +
                 '</div>' +
                 '<div class="admin-product-gallery__preview">' +
-                    '<img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.alt || item.filename || '') + '" draggable="false">' +
+                    '<img src="' + escapeHtml(item.url) + '" alt="' + escapeHtml(item.alt || item.filename || '') + '" draggable="false" loading="lazy" decoding="async">' +
                     (index === 0 ? '<span class="admin-product-gallery__badge">Основное</span>' : '') +
                     (listingTileEnabled && index === 0
                         ? '<button type="button" class="admin-icon-btn admin-product-gallery__tile-btn" title="Кадр каталога" aria-label="Кадр каталога">' +
@@ -282,7 +282,9 @@
                 return addItem({
                     linkId: null,
                     mediaId: mediaItem.id,
-                    url: mediaItem.urls && mediaItem.urls.medium ? mediaItem.urls.medium : mediaItem.url,
+                    url: mediaItem.urls && mediaItem.urls.mini
+                        ? mediaItem.urls.mini
+                        : (mediaItem.urls && mediaItem.urls.medium ? mediaItem.urls.medium : mediaItem.url),
                     alt: mediaItem.alt,
                     filename: mediaItem.filename,
                 });

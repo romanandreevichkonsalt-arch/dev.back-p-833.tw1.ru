@@ -149,10 +149,7 @@
         if (form && !form.dataset.searchPrioritySubmitBound) {
             form.dataset.searchPrioritySubmitBound = '1';
             form.addEventListener('submit', function () {
-                var active = activeVariant(root);
-                if (active) {
-                    syncVariantUi(root, active, false);
-                }
+                syncVariantUi(root, resolveActiveVariant(root), false);
             });
         }
     }
