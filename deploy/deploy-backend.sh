@@ -100,7 +100,18 @@ cd "$APP_ROOT"
 
 if [ -f composer.json ]; then
     echo "→ composer install..."
-    composer install --no-dev --optimize-autoloader --no-interaction --no-ansi
+    COMPOSER_BIN="${COMPOSER_BIN:-composer}"
+    if ! command -v "$COMPOSER_BIN" >/dev/null 2>&1; then
+        if [ -x "${USER_HOME}/bin/composer" ]; then
+            COMPOSER_BIN="${USER_HOME}/bin/composer"
+        elif [ -x "${HOME}/bin/composer" ]; then
+            COMPOSER_BIN="${HOME}/bin/composer"
+        else
+            echo "ERROR: composer not found. Install: curl -sS https://getcomposer.org/installer | php -- --install-dir=\$HOME/bin --filename=composer" >&2
+            exit 1
+        fi
+    fi
+    "$COMPOSER_BIN" install --no-dev --optimize-autoloader --no-interaction --no-ansi
 fi
 
 if [ "$MODE" = "files" ]; then

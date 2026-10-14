@@ -25,7 +25,7 @@
         );
     }
 
-    function syncHiddenFields(root) {
+    function syncHiddenFields(root, clearWhenInactive) {
         var productHidden = priorityProductInput(root);
         var sortHidden = prioritySortInput(root);
         var active = activeVariant(root);
@@ -35,8 +35,10 @@
         }
 
         if (!active) {
-            productHidden.value = '';
-            sortHidden.value = '';
+            if (clearWhenInactive) {
+                productHidden.value = '';
+                sortHidden.value = '';
+            }
             return;
         }
 
@@ -52,7 +54,7 @@
         }
     }
 
-    function syncVariantUi(root, activeRow) {
+    function syncVariantUi(root, activeRow, clearWhenInactive) {
         variantRows(root).forEach(function (row) {
             var sortInput = row.querySelector('[data-search-priority-sort]');
             if (!sortInput) {
@@ -72,7 +74,7 @@
                 }
             }
         });
-        syncHiddenFields(root);
+        syncHiddenFields(root, clearWhenInactive === true);
     }
 
     function initRoot(root) {
@@ -81,7 +83,7 @@
         }
         root.dataset.searchPriorityInit = '1';
 
-        syncVariantUi(root, activeVariant(root));
+        syncVariantUi(root, activeVariant(root), false);
 
         root.addEventListener('change', function (event) {
             var target = event.target;
@@ -97,24 +99,35 @@
                             input.checked = false;
                         }
                     });
-                    syncVariantUi(root, row);
+                    syncVariantUi(root, row, false);
                 } else {
-                    syncVariantUi(root, null);
+                    syncVariantUi(root, null, true);
                 }
                 return;
             }
 
             if (target.matches('[data-search-priority-sort]')) {
-                syncHiddenFields(root);
+                syncHiddenFields(root, false);
             }
         });
 
         root.addEventListener('input', function (event) {
             var target = event.target;
             if (target instanceof HTMLInputElement && target.matches('[data-search-priority-sort]')) {
-                syncHiddenFields(root);
+                syncHiddenFields(root, false);
             }
         });
+
+        var form = root.closest('form');
+        if (form && !form.dataset.searchPrioritySubmitBound) {
+            form.dataset.searchPrioritySubmitBound = '1';
+            form.addEventListener('submit', function () {
+                var active = activeVariant(root);
+                if (active) {
+                    syncVariantUi(root, active, false);
+                }
+            });
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -125,6 +138,6 @@
         if (!root) {
             return;
         }
-        syncVariantUi(root, activeVariant(root));
+        syncVariantUi(root, activeVariant(root), false);
     };
 })();

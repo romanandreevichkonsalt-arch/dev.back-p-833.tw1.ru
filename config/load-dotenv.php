@@ -44,6 +44,8 @@ function loadDotEnv(string $path): void
             || (str_starts_with($value, "'") && str_ends_with($value, "'"))
         ) {
             $value = substr($value, 1, -1);
+        } elseif (str_contains($value, '#')) {
+            $value = trim(preg_replace('/\s+#.*$/', '', $value) ?? $value);
         }
 
         putenv("{$name}={$value}");

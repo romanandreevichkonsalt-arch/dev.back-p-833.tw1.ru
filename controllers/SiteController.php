@@ -55,13 +55,11 @@ class SiteController extends Controller
     }
 
     /**
-     * Displays homepage.
-     *
-     * @return string
+     * API-домен: корень → админка (логин или дашборд).
      */
-    public function actionIndex()
+    public function actionIndex(): Response
     {
-        return $this->render('index');
+        return $this->redirect(['/admin']);
     }
 
     /**

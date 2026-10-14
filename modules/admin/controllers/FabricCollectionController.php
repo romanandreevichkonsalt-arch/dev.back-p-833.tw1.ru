@@ -6,6 +6,7 @@ use app\models\CatalogFabricCollection;
 use app\models\CatalogFabricColor;
 use app\models\CatalogModel;
 use app\models\CatalogPriceCategory;
+use app\services\catalog\CatalogListingValueParser;
 use app\services\catalog\CatalogModelProductSyncService;
 use app\services\catalog\FabricLibraryArchiveLauncher;
 use app\services\catalog\FabricLibraryArchiveUrls;
@@ -618,7 +619,9 @@ class FabricCollectionController extends BaseController
             $link->swatch_media_id = $nextSwatchMediaId;
             $link->sort_order = $sortOrder++;
             $link->is_active = $nextIsActive;
-            $link->is_recommended_fabric = filter_var($row['is_recommended_fabric'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $link->is_recommended_fabric = CatalogListingValueParser::parsePostedBoolean(
+                $row['is_recommended_fabric'] ?? false
+            );
             $link->position_number = $this->nullableInt($row['position_number'] ?? null);
 
             if (!$link->save()) {

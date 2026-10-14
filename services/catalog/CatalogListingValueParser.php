@@ -7,6 +7,22 @@ final class CatalogListingValueParser
     private const SIZE_SEPARATOR_PATTERN = '[×xXх*]';
 
     /**
+     * Значение чекбокса из POST (часто hidden value=0 + checkbox value=1 → массив [0, 1]).
+     */
+    public static function parsePostedBoolean(mixed $value): bool
+    {
+        if (is_array($value)) {
+            $value = end($value);
+        }
+
+        if ($value === true || $value === 1 || $value === '1') {
+            return true;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
      * @return array{width: int, height: int, depth: int, cornerDepth?: int}|null
      */
     public static function parseOverallSizeMm(?string $overallSize): ?array

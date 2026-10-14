@@ -5,6 +5,7 @@ namespace app\controllers\api\v1;
 use app\exceptions\ApiValidationException;
 use app\models\Lead;
 use app\services\lead\LeadAttachmentUploadService;
+use app\services\lead\LeadConsentAuditService;
 use OpenApi\Annotations as OA;
 use Yii;
 use yii\web\UploadedFile;
@@ -31,7 +32,8 @@ class LeadsController extends ApiController
      *     path="/api/v1/leads",
      *     tags={"Заявки"},
      *     summary="Создание заявки с сайта",
-     *     description="Типы (поле type): contacts — Контакты; faq — FAQ; partners — Партнер; designers — Дизайнер; vacancy — Вакансия. Для vacancy — multipart с attachment (резюме) или JSON без файла.",
+     *     description="Типы (поле type): contacts — Контакты; faq — FAQ; partners — Партнер; designers — Дизайнер; vacancy — Вакансия. Для vacancy — multipart с attachment (резюме) или JSON без файла. При consent=true сервер фиксирует время, ФИО из name и X-Session-ID/sessionId (если переданы).",
+     *     security={{"sessionId":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\MediaType(
@@ -76,6 +78,8 @@ class LeadsController extends ApiController
         if (!$lead->validate()) {
             throw new ApiValidationException('Ошибка валидации.', $lead->getErrors());
         }
+
+        (new LeadConsentAuditService())->apply($lead);
 
         if (!$lead->save(false)) {
             throw new ApiValidationException('Не удалось сохранить заявку.');

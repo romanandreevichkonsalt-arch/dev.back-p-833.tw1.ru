@@ -39,6 +39,12 @@ $empty = static fn (?string $value): string => ($value !== null && trim($value) 
         </div>
         <div><span class="admin-detail-label">Город</span><div><?= $empty($model->city) ?></div></div>
         <div><span class="admin-detail-label">Дата создания</span><div><?= Html::encode($model->created_at) ?></div></div>
+        <?php if ($model->consent): ?>
+            <div><span class="admin-detail-label">Согласие на обработку ПДн</span><div>Да</div></div>
+            <div><span class="admin-detail-label">Согласие: кто отметил</span><div><?= $empty($model->consent_given_by_name) ?></div></div>
+            <div><span class="admin-detail-label">Согласие: когда</span><div><?= $empty($model->consent_given_at) ?></div></div>
+            <div><span class="admin-detail-label">Согласие: session ID</span><div><?= $empty($model->consent_session_id) ?></div></div>
+        <?php endif; ?>
         <div>
             <span class="admin-detail-label">Статус</span>
             <div>

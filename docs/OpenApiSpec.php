@@ -3086,7 +3086,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="email", type="string", format="email", nullable=true, example="user@example.com", description="Обязателен для vacancy"),
  *     @OA\Property(property="phone", type="string", nullable=true, example="+79894232000", description="E.164 (+7 и 10 цифр). Обязателен для contacts, faq, partners, designers"),
  *     @OA\Property(property="comment", type="string", nullable=true, description="Комментарий: contacts, faq, partners, vacancy"),
- *     @OA\Property(property="consent", type="boolean", example=true, description="Согласие на обработку персональных данных (должно быть true)"),
+ *     @OA\Property(property="consent", type="boolean", example=true, description="Согласие на обработку персональных данных (должно быть true). Сервер сохраняет consent_given_at, consent_given_by_name (копия name) и consent_session_id из X-Session-ID/sessionId."),
  *     @OA\Property(property="studio", type="string", nullable=true, description="Только designers — студия"),
  *     @OA\Property(property="portfolio", type="string", format="uri", nullable=true, description="Только designers — ссылка на портфолио"),
  *     @OA\Property(property="city", type="string", nullable=true, description="Только designers — город"),

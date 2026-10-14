@@ -26,6 +26,27 @@ class LeadsApiTest extends ApiTestCase
         verify($response)->arrayHasKey('id');
         verify($response['ok'])->true();
         verify(Lead::find()->count())->equals($before + 1);
+
+        $lead = Lead::findOne((int)$response['id']);
+        verify($lead)->notNull();
+        verify($lead->consent_given_by_name)->equals('Тест Тестов');
+        verify($lead->consent_given_at)->notEmpty();
+    }
+
+    public function testCreateLeadStoresConsentSessionId(): void
+    {
+        $this->withSession('lead-consent-test-sess99');
+
+        $response = $this->postJson('api/v1/leads/create', [
+            'type' => 'faq',
+            'name' => 'Сессия Тест',
+            'phone' => '+79894232001',
+            'consent' => true,
+        ]);
+
+        $lead = Lead::findOne((int)$response['id']);
+        verify($lead)->notNull();
+        verify($lead->consent_session_id)->equals('lead-consent-test-sess99');
     }
 
     public function testCreateDesignersLead(): void

@@ -110,4 +110,13 @@ class CatalogListingValueParserTest extends Unit
         verify(CatalogListingValueParser::parsePriceAmount(''))->null();
         verify(CatalogListingValueParser::parsePriceAmount('по запросу'))->null();
     }
+
+    public function testParsePostedBoolean(): void
+    {
+        verify(CatalogListingValueParser::parsePostedBoolean('1'))->true();
+        verify(CatalogListingValueParser::parsePostedBoolean('0'))->false();
+        verify(CatalogListingValueParser::parsePostedBoolean(['0', '1']))->true();
+        verify(CatalogListingValueParser::parsePostedBoolean(['0']))->false();
+        verify(CatalogListingValueParser::parsePostedBoolean(true))->true();
+    }
 }

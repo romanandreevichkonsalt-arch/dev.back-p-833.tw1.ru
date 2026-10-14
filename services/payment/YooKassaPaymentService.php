@@ -321,7 +321,8 @@ class YooKassaPaymentService
     {
         $base = trim((string)(Yii::$app->params['yookassa']['returnUrl'] ?? ''));
         if ($base === '') {
-            $base = 'https://dev.front-p-833.tw1.ru/cart?fromPayment=1';
+            $frontend = rtrim(trim((string)(Yii::$app->params['frontendUrl'] ?? '')), '/');
+            $base = ($frontend !== '' ? $frontend : 'https://dev.front-p-833.tw1.ru') . '/cart?fromPayment=1';
         }
 
         $separator = str_contains($base, '?') ? '&' : '?';

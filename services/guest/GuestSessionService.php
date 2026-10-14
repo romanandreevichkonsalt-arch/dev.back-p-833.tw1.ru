@@ -27,6 +27,20 @@ class GuestSessionService
         $model->save(false, ['updated_at']);
     }
 
+    /**
+     * Как resolveFromRequest(), но без исключения при некорректном ID (для необязательного audit).
+     */
+    public function resolveFromRequestOptional(): ?string
+    {
+        try {
+            $sessionId = $this->resolveFromRequest();
+
+            return $sessionId !== '' ? $sessionId : null;
+        } catch (BadRequestHttpException) {
+            return null;
+        }
+    }
+
     public function resolveFromRequest(): string
     {
         $request = Yii::$app->request;

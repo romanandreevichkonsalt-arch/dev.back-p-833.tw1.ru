@@ -34,10 +34,12 @@ SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15)
 if [ -n "${SSH_ASKPASS:-}" ] && [ ! -x "${SSH_ASKPASS}" ]; then
   unset SSH_ASKPASS SSH_ASKPASS_REQUIRE DISPLAY
 fi
-if [ -n "${SSH_IDENTITY_FILE:-}" ]; then
-  SSH_OPTS+=(-i "$SSH_IDENTITY_FILE")
+if [ -n "${SSH_ASKPASS:-}" ] && [ -z "${SSH_IDENTITY_FILE:-}" ]; then
+  SSH_OPTS+=(-o PreferredAuthentications=password -o PubkeyAuthentication=no)
+elif [ -n "${SSH_IDENTITY_FILE:-}" ]; then
+  SSH_OPTS+=(-o IdentitiesOnly=yes -i "$SSH_IDENTITY_FILE")
 elif [ -f "${HOME}/.ssh/github_actions_deploy" ]; then
-  SSH_OPTS+=(-i "${HOME}/.ssh/github_actions_deploy")
+  SSH_OPTS+=(-o IdentitiesOnly=yes -i "${HOME}/.ssh/github_actions_deploy")
 fi
 
 ssh_cmd() {
@@ -70,6 +72,7 @@ RSYNC_EXCLUDES=(
   --exclude='web/assets/'
   --exclude='web/uploads/'
   --exclude='deploy/.ssh-askpass.sh'
+  --exclude='deploy/.ssh-askpass-prod.sh'
 )
 
 echo "→ Режим: ${MODE}"
