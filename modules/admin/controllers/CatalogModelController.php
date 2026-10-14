@@ -189,7 +189,7 @@ class CatalogModelController extends BaseController
         return [
             'linkId' => (int)$link->id,
             'mediaId' => $mediaId,
-            'url' => $media->getAdminThumbUrl(),
+            'url' => $media->getAdminGalleryPreviewUrl(),
             'alt' => $media->alt,
             'filename' => $media->filename,
         ];
@@ -283,7 +283,7 @@ class CatalogModelController extends BaseController
         return [
             'linkId' => (int)$link->id,
             'mediaId' => $mediaId,
-            'url' => $media->getAdminThumbUrl(),
+            'url' => $media->getAdminGalleryPreviewUrl(),
             'alt' => $media->alt,
             'filename' => $media->filename,
         ];

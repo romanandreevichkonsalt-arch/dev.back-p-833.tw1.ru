@@ -163,10 +163,10 @@ class MediaFile extends ActiveRecord
         return $this->getPublicUrl('medium');
     }
 
-    /** Миниатюра для админки (сетки галерей, превью ~40–120px). */
-    public function getAdminThumbUrl(): string
+    /** Превью карточек галереи в админке (ракурсы модели и т.п.). */
+    public function getAdminGalleryPreviewUrl(): string
     {
-        return $this->getPublicUrl('mini');
+        return $this->getPublicUrl('medium');
     }
 
     /**

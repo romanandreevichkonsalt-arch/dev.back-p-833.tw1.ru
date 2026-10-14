@@ -282,9 +282,7 @@
                 return addItem({
                     linkId: null,
                     mediaId: mediaItem.id,
-                    url: mediaItem.urls && mediaItem.urls.mini
-                        ? mediaItem.urls.mini
-                        : (mediaItem.urls && mediaItem.urls.medium ? mediaItem.urls.medium : mediaItem.url),
+                    url: mediaItem.urls && mediaItem.urls.medium ? mediaItem.urls.medium : mediaItem.url,
                     alt: mediaItem.alt,
                     filename: mediaItem.filename,
                 });

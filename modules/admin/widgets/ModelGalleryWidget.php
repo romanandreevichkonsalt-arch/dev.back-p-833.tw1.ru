@@ -39,7 +39,7 @@ class ModelGalleryWidget extends Widget
                 $items[] = [
                     'linkId' => (int)$link->id,
                     'mediaId' => (int)$link->media_file_id,
-                    'url' => $link->media->getAdminThumbUrl(),
+                    'url' => $link->media->getAdminGalleryPreviewUrl(),
                     'alt' => $link->media->alt ?? $link->media->filename,
                     'filename' => $link->media->filename,
                 ];
