@@ -22,7 +22,7 @@ class FabricCollectionColorsWidget extends Widget
         if ($this->collection !== null && !$this->collection->isNewRecord) {
             $links = CatalogFabricColor::find()
                 ->where(['fabric_collection_id' => $this->collection->id])
-                ->with(['catalogColor', 'swatchMedia'])
+                ->with(['catalogColor', 'swatchMedia', 'libraryPhotos.media'])
                 ->orderBy(CatalogFabricColor::defaultSortOrder())
                 ->all();
         }

@@ -4,7 +4,9 @@ namespace app\modules\admin\controllers;
 
 use app\models\CatalogFabricCollection;
 use app\models\CatalogFabricColor;
+use app\models\CatalogFabricColorLibraryPhoto;
 use app\models\CatalogModel;
+use app\models\MediaFile;
 use app\models\CatalogPriceCategory;
 use app\services\catalog\CatalogListingValueParser;
 use app\services\catalog\CatalogModelProductSyncService;
@@ -629,6 +631,8 @@ class FabricCollectionController extends BaseController
                 continue;
             }
 
+            $this->syncLibraryPhotos($link, (array)($row['library_photo_media_ids'] ?? []));
+
             $keptIds[] = (int)$link->id;
         }
 
@@ -690,6 +694,54 @@ class FabricCollectionController extends BaseController
         }
 
         return (int)$value;
+    }
+
+    /**
+     * @param int[]|string[] $mediaIds
+     */
+    private function syncLibraryPhotos(CatalogFabricColor $link, array $mediaIds): void
+    {
+        $orderedIds = [];
+        foreach ($mediaIds as $mediaId) {
+            $mediaId = (int)$mediaId;
+            if ($mediaId <= 0 || in_array($mediaId, $orderedIds, true)) {
+                continue;
+            }
+            if (MediaFile::find()->where(['id' => $mediaId])->exists() === false) {
+                continue;
+            }
+            $orderedIds[] = $mediaId;
+        }
+
+        $existing = CatalogFabricColorLibraryPhoto::find()
+            ->where(['fabric_color_id' => (int)$link->id])
+            ->indexBy('media_file_id')
+            ->all();
+
+        $sortOrder = 0;
+        foreach ($orderedIds as $mediaId) {
+            if (isset($existing[$mediaId])) {
+                $photo = $existing[$mediaId];
+                if ((int)$photo->sort_order !== $sortOrder) {
+                    $photo->sort_order = $sortOrder;
+                    $photo->save(false, ['sort_order']);
+                }
+                unset($existing[$mediaId]);
+            } else {
+                $photo = new CatalogFabricColorLibraryPhoto([
+                    'fabric_color_id' => (int)$link->id,
+                    'media_file_id' => $mediaId,
+                    'sort_order' => $sortOrder,
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+                $photo->save(false);
+            }
+            $sortOrder++;
+        }
+
+        foreach ($existing as $photo) {
+            $photo->delete();
+        }
     }
 
     private function findModel(int $id): CatalogFabricCollection

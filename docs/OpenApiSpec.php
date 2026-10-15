@@ -15,7 +15,7 @@ use OpenApi\Annotations as OA;
  *
  * @OA\Info(
  *     title="Fabrika API",
- *     version="1.10.47",
+ *     version="1.10.49",
  *     description="Документация API: страницы (вакансии — направления из БД, values.slides), каталог (retailPrice — розница, dealerPrice — скидка/акция дилера; POST /catalog/models/{slug}/3d-file — загрузка 3D-файла модели, не в карточке товара), корзина и заказы (guest → ЮKassa paymentConfirmationUrl; дилер → заявка менеджеру; retailSubtotal, dealerDiscountAmount, discounts: dealer→promo→cashback; totalAmount включает cashlessSurchargeAmount), избранное (X-Session-ID), мудборд (Bearer или X-Session-ID; GET /moodboard/public/{shareCode}), ЛКД дилера, журнал, поиск, DaData, webhook ЮKassa"
  * )
  *
@@ -26,7 +26,7 @@ use OpenApi\Annotations as OA;
  *
  * @OA\Tag(
  *     name="Каталог",
- *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — только рекомендуемые ткани для страницы библиотеки (сортировка по position_number); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
+ *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — только рекомендуемые ткани для страницы библиотеки (сортировка по position_number); в каждом item — swatch (основное фото образца) и additionalPhotos[] (доп. фото только для этого метода, из админки коллекции ткани); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
  * )
  *
  * @OA\Tag(
@@ -1910,7 +1910,7 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="CatalogLibraryFabricItem",
  *     type="object",
- *     required={"fabricColorId","slug","label","isRecommendedFabric"},
+ *     required={"fabricColorId","slug","label","isRecommendedFabric","additionalPhotos"},
  *     @OA\Property(property="fabricColorId", type="integer", example=42),
  *     @OA\Property(property="slug", type="string", description="slug catalog_colors или design_code"),
  *     @OA\Property(property="label", type="string", example="GUCCI 422"),
@@ -1925,7 +1925,16 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="isRecommendedFabric", type="boolean"),
  *     @OA\Property(property="positionNumber", type="integer", nullable=true, description="Порядок среди рекомендуемых"),
  *     @OA\Property(property="description", type="string", nullable=true, description="Описание цветодизайна"),
- *     @OA\Property(property="swatch", ref="#/components/schemas/CatalogImage", nullable=true)
+ *     @OA\Property(property="swatch", ref="#/components/schemas/CatalogImage", nullable=true),
+ *     @OA\Property(
+ *         property="additionalPhotos",
+ *         type="array",
+ *         description="Дополнительные фото цветодизайна для страницы библиотеки. Задаются в админке «Ткани → коллекция → цвет → Доп. фото для библиотеки». Порядок в массиве — порядок в админке. Не дублирует swatch и не входит в swatches карточки товара.",
+ *         @OA\Items(ref="#/components/schemas/CatalogImage"),
+ *         example={
+ *             {"src"="/uploads/media/fabrics/2026/10/sample_m.webp","alt"="GUCCI 422","srcSet"={"mini"="/uploads/media/fabrics/2026/10/sample_s.webp","medium"="/uploads/media/fabrics/2026/10/sample_m.webp","large"="/uploads/media/fabrics/2026/10/sample_l.webp","original"="/uploads/media/fabrics/2026/10/sample.png"}}
+ *         }
+ *     )
  * )
  *
  * @OA\Schema(

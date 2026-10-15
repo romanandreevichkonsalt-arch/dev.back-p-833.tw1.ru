@@ -57,6 +57,18 @@
         return item.displayFilename || item.filename || '';
     }
 
+    function anyAdminModalVisible() {
+        return document.querySelector('.admin-modal:not([hidden])') !== null;
+    }
+
+    function syncAdminModalOpenClass() {
+        if (anyAdminModalVisible()) {
+            document.body.classList.add('admin-modal-open');
+        } else {
+            document.body.classList.remove('admin-modal-open');
+        }
+    }
+
     /**
      * @param {HTMLElement} root — .admin-media-picker или .admin-product-gallery
      * @param {object} options
@@ -116,13 +128,35 @@
             uploadWarning.textContent = message || '';
         }
 
+        function restoreModalPortal() {
+            if (!modal._portalHost) {
+                return;
+            }
+            modal._portalHost.appendChild(modal);
+            delete modal._portalHost;
+        }
+
+        function portalModalIfNeeded() {
+            if (modal._portalHost) {
+                return;
+            }
+            var hostModal = root.closest('.admin-modal');
+            if (!hostModal || hostModal === modal) {
+                return;
+            }
+            modal._portalHost = modal.parentElement;
+            document.body.appendChild(modal);
+        }
+
         function closeModal() {
             modal.hidden = true;
-            document.body.classList.remove('admin-modal-open');
+            restoreModalPortal();
+            syncAdminModalOpenClass();
             setUploadWarning('');
         }
 
         function openModal() {
+            portalModalIfNeeded();
             modal.hidden = false;
             document.body.classList.add('admin-modal-open');
             if (searchInput) {
@@ -421,20 +455,25 @@
 
             Promise.all(uploads)
                 .then(function (items) {
+                    var attachChain = Promise.resolve();
                     if (options.onUploaded) {
                         items.forEach(function (item) {
-                            options.onUploaded(item);
+                            attachChain = attachChain.then(function () {
+                                return Promise.resolve(options.onUploaded(item));
+                            });
                         });
                     }
-                    if (mode === 'single' && items.length === 1 && onSelect) {
-                        onSelect(items[0]);
-                        closeModal();
-                    } else {
-                        loadModalItems(searchInput ? searchInput.value.trim() : '');
-                    }
-                    if (fileInput) {
-                        fileInput.value = '';
-                    }
+                    return attachChain.then(function () {
+                        if (mode === 'single' && items.length === 1 && onSelect) {
+                            onSelect(items[0]);
+                            closeModal();
+                        } else {
+                            loadModalItems(searchInput ? searchInput.value.trim() : '');
+                        }
+                        if (fileInput) {
+                            fileInput.value = '';
+                        }
+                    });
                 })
                 .catch(function (error) {
                     onError(error.message || 'Не удалось загрузить файл.');

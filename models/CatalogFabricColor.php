@@ -365,6 +365,32 @@ class CatalogFabricColor extends ActiveRecord
             ->orderBy(['sort_order' => SORT_ASC, 'id' => SORT_ASC]);
     }
 
+    public function getLibraryPhotos()
+    {
+        return $this->hasMany(CatalogFabricColorLibraryPhoto::class, ['fabric_color_id' => 'id'])
+            ->orderBy(['sort_order' => SORT_ASC, 'id' => SORT_ASC]);
+    }
+
+    /**
+     * Доп. фото для GET /api/v1/catalog/library-fabrics (не swatch и не swatches карточки товара).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function collectLibraryPhotosApiPayload(): array
+    {
+        $photos = [];
+        foreach ($this->libraryPhotos as $link) {
+            if ($link->media === null) {
+                continue;
+            }
+            $photos[] = $link->media->toMaterialApiImagePayload(
+                $link->media->alt ?? $this->getProductColorLabel()
+            );
+        }
+
+        return $photos;
+    }
+
     public function beforeDelete(): bool
     {
         if (!parent::beforeDelete()) {

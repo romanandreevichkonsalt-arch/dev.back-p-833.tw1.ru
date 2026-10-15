@@ -37,6 +37,132 @@
         }
     }
 
+    function getModalLibraryGallery(section) {
+        var modal = section.querySelector('[data-fabric-color-modal]');
+        if (!modal) {
+            return null;
+        }
+        return modal.querySelector('#fabric-color-modal-library-gallery');
+    }
+
+    function ensureLibraryGalleryReady(section) {
+        var gallery = getModalLibraryGallery(section);
+        if (!gallery) {
+            return null;
+        }
+        if (!gallery.__galleryApi && window.AdminProductGallery) {
+            window.AdminProductGallery.init(gallery);
+        }
+        return gallery;
+    }
+
+    function closeNestedMediaLibraryModal(section) {
+        var gallery = getModalLibraryGallery(section);
+        if (!gallery) {
+            return;
+        }
+        var mediaModal = document.getElementById('fabric-color-modal-library-gallery-modal')
+            || gallery.querySelector('.admin-media-library__modal');
+        if (mediaModal) {
+            mediaModal.hidden = true;
+        }
+    }
+
+    function parseLibraryPhotos(raw) {
+        if (!raw) {
+            return [];
+        }
+        try {
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function readLibraryPhotosFromRow(row) {
+        if (!row) {
+            return [];
+        }
+        var store = row.querySelector('[data-fabric-color-library-photos-store]');
+        if (store && store.value) {
+            return parseLibraryPhotos(store.value);
+        }
+        return parseLibraryPhotos(row.getAttribute('data-library-photos') || '[]');
+    }
+
+    function buildLibraryPhotosIndicatorHtml(count) {
+        var total = parseInt(String(count || 0), 10);
+        if (!total || total < 1) {
+            return '<span class="admin-muted">—</span>';
+        }
+        return '<span class="admin-fabric-colors__library-flag" title="Доп. фото для library-fabrics: '
+            + total + '">' + total + '</span>';
+    }
+
+    function updateLibraryPhotosIndicator(row, items) {
+        if (!row) {
+            return;
+        }
+        var cell = row.querySelector('[data-fabric-color-display-library-photos]');
+        if (!cell) {
+            return;
+        }
+        cell.innerHTML = buildLibraryPhotosIndicatorHtml((items || []).length);
+    }
+
+    function writeLibraryPhotosToRow(row, rowKey, items) {
+        if (!row) {
+            return;
+        }
+        var normalized = (items || []).map(function (item) {
+            return {
+                linkId: item.linkId || null,
+                mediaId: item.mediaId,
+                url: item.url,
+                alt: item.alt,
+                filename: item.filename,
+            };
+        });
+        var json = JSON.stringify(normalized);
+        row.setAttribute('data-library-photos', json);
+        var store = row.querySelector('[data-fabric-color-library-photos-store]');
+        if (store) {
+            store.value = json;
+        }
+        var inputsHost = row.querySelector('[data-fabric-color-library-photo-inputs]');
+        if (!inputsHost) {
+            return;
+        }
+        inputsHost.innerHTML = '';
+        normalized.forEach(function (item) {
+            if (!item.mediaId) {
+                return;
+            }
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'fabric_color_links[' + rowKey + '][library_photo_media_ids][]';
+            input.value = String(item.mediaId);
+            inputsHost.appendChild(input);
+        });
+        updateLibraryPhotosIndicator(row, normalized);
+    }
+
+    function setModalLibraryPhotos(section, items) {
+        var gallery = ensureLibraryGalleryReady(section);
+        if (gallery && gallery.__galleryApi) {
+            gallery.__galleryApi.setItems(items || []);
+        }
+    }
+
+    function getModalLibraryPhotos(section) {
+        var gallery = ensureLibraryGalleryReady(section);
+        if (gallery && gallery.__galleryApi) {
+            return gallery.__galleryApi.getItems();
+        }
+        return [];
+    }
+
     function buildSwatchHtml(mediaId, previewUrl) {
         if (previewUrl) {
             return '<img class="admin-fabric-colors__thumb" src="' + previewUrl.replace(/"/g, '&quot;') + '" alt="" loading="lazy" decoding="async">';
@@ -76,6 +202,7 @@
                 descriptionInput.value = storedDescription ? storedDescription.value : '';
             }
             setPickerValue(modal, row.getAttribute('data-swatch-media-id') || '', row.getAttribute('data-swatch-url') || '');
+            setModalLibraryPhotos(section, readLibraryPhotosFromRow(row));
         } else {
             if (title) title.textContent = 'Добавить цвет';
             if (editKey) editKey.value = '';
@@ -84,8 +211,10 @@
             if (colorSelect) colorSelect.value = '';
             if (descriptionInput) descriptionInput.value = '';
             setPickerValue(modal, '', '');
+            setModalLibraryPhotos(section, []);
         }
 
+        ensureLibraryGalleryReady(section);
         modal.hidden = false;
         document.body.classList.add('admin-modal-open');
     }
@@ -95,8 +224,11 @@
         if (!modal) {
             return;
         }
+        closeNestedMediaLibraryModal(section);
         modal.hidden = true;
-        document.body.classList.remove('admin-modal-open');
+        if (!document.querySelector('.admin-modal:not([hidden])')) {
+            document.body.classList.remove('admin-modal-open');
+        }
     }
 
     function updateExistingRow(existing, payload, colorSelect) {
@@ -136,6 +268,7 @@
         if (descriptionField) {
             descriptionField.value = payload.description || '';
         }
+        writeLibraryPhotosToRow(existing, payload.rowKey || existing.getAttribute('data-row-key') || '', payload.libraryPhotos || []);
     }
 
     function upsertRow(section, payload) {
@@ -170,7 +303,11 @@
             .replace(/__SWATCH_MEDIA_ID__/g, payload.swatchMediaId || '')
             .replace(/__SWATCH_HTML__/g, swatchHtml)
             .replace(/__IS_RECOMMENDED_CHECKED__/g, isRecommended ? 'checked' : '')
-            .replace(/__POSITION_NUMBER__/g, positionNumber.replace(/"/g, '&quot;'));
+            .replace(/__POSITION_NUMBER__/g, positionNumber.replace(/"/g, '&quot;'))
+            .replace(
+                /__LIBRARY_PHOTOS_INDICATOR__/g,
+                buildLibraryPhotosIndicatorHtml((payload.libraryPhotos || []).length)
+            );
 
         var wrapper = document.createElement('tbody');
         wrapper.innerHTML = html.trim();
@@ -190,6 +327,7 @@
         if (descriptionField) {
             descriptionField.value = payload.description || '';
         }
+        writeLibraryPhotosToRow(newRow, rowKey, payload.libraryPhotos || []);
 
         tbody.appendChild(newRow);
 
@@ -274,6 +412,7 @@
                     swatchMediaId: swatchMediaId,
                     swatchPreviewUrl: swatchPreviewUrl,
                     description: description,
+                    libraryPhotos: getModalLibraryPhotos(section),
                 };
 
                 if (editRow) {

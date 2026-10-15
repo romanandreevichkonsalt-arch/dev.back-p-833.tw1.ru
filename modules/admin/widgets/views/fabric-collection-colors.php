@@ -2,8 +2,11 @@
 
 use app\models\CatalogColor;
 use app\models\CatalogFabricColor;
+use app\models\MediaFile;
 use app\modules\admin\widgets\MediaPickerWidget;
 use yii\helpers\Html;
+use yii\helpers\Url;
+use Yii;
 
 /** @var yii\web\View $this */
 /** @var app\models\CatalogFabricCollection|null $collection */
@@ -36,6 +39,7 @@ $productCountByColorId = $productCountByColorId ?? [];
             <th>Фото</th>
             <th>Реком. ткань</th>
             <th>№ позиции</th>
+            <th class="admin-fabric-colors__library-col" title="Доп. фото для API library-fabrics">Доп. фото</th>
             <th></th>
         </tr>
         </thead>
@@ -102,6 +106,33 @@ $productCountByColorId = $productCountByColorId ?? [];
                         'label' => 'Фото образца',
                     ]) ?>
                 </div>
+
+                <?php
+                $libraryGalleryId = 'fabric-color-modal-library-gallery';
+                echo $this->render('@app/modules/admin/widgets/views/collection-gallery', [
+                    'pickerId' => $libraryGalleryId,
+                    'entityId' => 0,
+                    'galleryTitle' => 'Доп. фото для библиотеки',
+                    'galleryHint' => 'Только для API library-fabrics (массив additionalPhotos). Порядок карточек — порядок в ответе.',
+                    'hideTitle' => false,
+                    'hideHint' => false,
+                    'purpose' => '',
+                    'defaultFolder' => 'fabrics',
+                    'pendingInputName' => 'fabric_color_modal_library_photos[]',
+                    'foldersListUrl' => Url::to(['/admin/media/folders-list']),
+                    'items' => [],
+                    'itemsJson' => '[]',
+                    'uploadUrl' => Url::to(['/admin/media/quick-upload']),
+                    'libraryListUrl' => Url::to(['/admin/media/library-list', 'kind' => MediaFile::KIND_IMAGE]),
+                    'galleryAddUrl' => '',
+                    'galleryDeleteUrl' => '',
+                    'galleryReorderUrl' => '',
+                    'csrfParam' => Yii::$app->request->csrfParam,
+                    'csrfToken' => Yii::$app->request->csrfToken,
+                    'inlineHeader' => false,
+                    'listingTileEnabled' => false,
+                ]);
+                ?>
             </div>
             <div class="admin-modal__footer">
                 <button type="button" class="admin-btn admin-btn--secondary" data-fabric-color-modal-close>Отмена</button>
@@ -111,7 +142,7 @@ $productCountByColorId = $productCountByColorId ?? [];
     </div>
 
     <template id="admin-fabric-color-row-template">
-        <tr data-fabric-color-row data-row-key="__ROW_KEY__" data-product-count="0">
+        <tr data-fabric-color-row data-row-key="__ROW_KEY__" data-product-count="0" data-library-photos="[]">
             <td>
                 <strong data-fabric-color-display-code>__DESIGN_CODE__</strong>
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][id]" value="__LINK_ID__">
@@ -119,6 +150,8 @@ $productCountByColorId = $productCountByColorId ?? [];
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][color_id]" value="__COLOR_ID__">
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][swatch_media_id]" value="__SWATCH_MEDIA_ID__">
                 <textarea name="fabric_color_links[__ROW_KEY__][description]" class="admin-fabric-colors__description-store" hidden tabindex="-1"></textarea>
+                <div data-fabric-color-library-photo-inputs hidden></div>
+                <textarea class="admin-fabric-colors__library-photos-store" data-fabric-color-library-photos-store hidden tabindex="-1">[]</textarea>
                 <input type="hidden" name="fabric_color_links[__ROW_KEY__][is_active]" value="1">
             </td>
             <td data-fabric-color-display-label>__COLOR_LABEL__</td>
@@ -130,6 +163,7 @@ $productCountByColorId = $productCountByColorId ?? [];
             <td class="admin-fabric-colors__position">
                 <input type="number" class="form-control admin-fabric-colors__position-input" name="fabric_color_links[__ROW_KEY__][position_number]" value="__POSITION_NUMBER__" min="0" step="1" aria-label="№ позиции">
             </td>
+            <td class="admin-fabric-colors__library-col" data-fabric-color-display-library-photos>__LIBRARY_PHOTOS_INDICATOR__</td>
             <td class="admin-table-actions">
                 <button type="button" class="admin-icon-btn" data-fabric-color-edit title="Редактировать" aria-label="Редактировать">
                     <svg class="admin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>

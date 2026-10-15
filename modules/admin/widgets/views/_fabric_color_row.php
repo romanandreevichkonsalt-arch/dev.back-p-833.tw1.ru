@@ -1,6 +1,7 @@
 <?php
 
 use yii\helpers\Html;
+use yii\helpers\Json;
 
 /** @var yii\web\View $this */
 /** @var app\models\CatalogFabricColor $link */
@@ -12,6 +13,31 @@ $colorLabel = $link->catalogColor?->label ?? '—';
 $swatchHtml = $link->getSwatchPreviewUrl() !== null
     ? Html::img($link->getSwatchPreviewUrl(), ['class' => 'admin-fabric-colors__thumb', 'alt' => '', 'loading' => 'lazy', 'decoding' => 'async'])
     : Html::tag('span', '—', ['class' => 'admin-muted']);
+$libraryPhotoItems = [];
+foreach ($link->libraryPhotos as $photoLink) {
+    if ($photoLink->media === null) {
+        continue;
+    }
+    $libraryPhotoItems[] = [
+        'linkId' => (int)$photoLink->id,
+        'mediaId' => (int)$photoLink->media_file_id,
+        'url' => $photoLink->media->getAdminGalleryPreviewUrl(),
+        'alt' => $photoLink->media->alt ?? $photoLink->media->filename,
+        'filename' => $photoLink->media->filename,
+    ];
+}
+$libraryPhotosJson = Json::encode($libraryPhotoItems);
+$libraryPhotoCount = count($libraryPhotoItems);
+$libraryPhotosIndicatorHtml = $libraryPhotoCount > 0
+    ? Html::tag(
+        'span',
+        (string)$libraryPhotoCount,
+        [
+            'class' => 'admin-fabric-colors__library-flag',
+            'title' => 'Доп. фото для library-fabrics: ' . $libraryPhotoCount,
+        ]
+    )
+    : Html::tag('span', '—', ['class' => 'admin-muted']);
 ?>
 <tr
     data-fabric-color-row
@@ -22,6 +48,7 @@ $swatchHtml = $link->getSwatchPreviewUrl() !== null
     data-swatch-url="<?= Html::encode((string)$link->getSwatchPreviewUrl()) ?>"
     data-link-id="<?= (int)$link->id ?>"
     data-product-count="<?= (int)$productCount ?>"
+    data-library-photos="<?= Html::encode($libraryPhotosJson) ?>"
 >
     <td>
         <strong data-fabric-color-display-code><?= Html::encode($link->design_code) ?></strong>
@@ -35,6 +62,21 @@ $swatchHtml = $link->getSwatchPreviewUrl() !== null
             hidden
             tabindex="-1"
         ><?= Html::encode((string)($link->description ?? '')) ?></textarea>
+        <div data-fabric-color-library-photo-inputs hidden>
+            <?php foreach ($libraryPhotoItems as $photoItem): ?>
+                <input
+                    type="hidden"
+                    name="fabric_color_links[<?= Html::encode($rowKey) ?>][library_photo_media_ids][]"
+                    value="<?= (int)$photoItem['mediaId'] ?>"
+                >
+            <?php endforeach; ?>
+        </div>
+        <textarea
+            class="admin-fabric-colors__library-photos-store"
+            data-fabric-color-library-photos-store
+            hidden
+            tabindex="-1"
+        ><?= Html::encode($libraryPhotosJson) ?></textarea>
         <input type="hidden" name="fabric_color_links[<?= Html::encode($rowKey) ?>][is_active]" value="1">
     </td>
     <td data-fabric-color-display-label><?= Html::encode($colorLabel) ?></td>
@@ -60,6 +102,7 @@ $swatchHtml = $link->getSwatchPreviewUrl() !== null
             aria-label="№ позиции"
         >
     </td>
+    <td class="admin-fabric-colors__library-col" data-fabric-color-display-library-photos><?= $libraryPhotosIndicatorHtml ?></td>
     <td class="admin-table-actions">
         <button type="button" class="admin-icon-btn" data-fabric-color-edit title="Редактировать" aria-label="Редактировать">
             <svg class="admin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>

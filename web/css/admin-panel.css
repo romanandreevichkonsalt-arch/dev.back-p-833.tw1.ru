@@ -2526,6 +2526,52 @@ body.admin-modal-open {
     max-width: 640px;
 }
 
+.admin-fabric-color-modal #fabric-color-modal-library-gallery {
+    margin-top: 20px;
+}
+
+.admin-fabric-color-modal #fabric-color-modal-library-gallery .admin-product-gallery__grid {
+    min-height: 72px;
+}
+
+.admin-media-library__modal {
+    z-index: 1300;
+}
+
+.admin-media-library__folder-pick {
+    z-index: 1310;
+}
+
+.admin-fabric-colors__library-photos-store {
+    display: none !important;
+}
+
+.admin-fabric-colors__library-col {
+    width: 72px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.admin-fabric-colors__table th.admin-fabric-colors__library-col {
+    font-size: 12px;
+}
+
+.admin-fabric-colors__library-flag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--admin-surface-muted, #f3f2ef);
+    border: 1px solid var(--admin-border);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--admin-text, #1a1a1a);
+}
+
 .admin-form-checks {
     display: flex;
     flex-direction: column;

@@ -7,6 +7,30 @@
             .replace(/"/g, '&quot;');
     }
 
+    function resolveMediaPreviewUrl(mediaItem) {
+        if (!mediaItem) {
+            return '';
+        }
+        if (mediaItem.url) {
+            return mediaItem.url;
+        }
+        if (mediaItem.urls) {
+            if (mediaItem.urls.medium) {
+                return mediaItem.urls.medium;
+            }
+            if (mediaItem.urls.large) {
+                return mediaItem.urls.large;
+            }
+            if (mediaItem.urls.original) {
+                return mediaItem.urls.original;
+            }
+            if (mediaItem.urls.mini) {
+                return mediaItem.urls.mini;
+            }
+        }
+        return '';
+    }
+
     function initGallery(root) {
         if (root.dataset.initialized === '1') {
             return;
@@ -282,7 +306,7 @@
                 return addItem({
                     linkId: null,
                     mediaId: mediaItem.id,
-                    url: mediaItem.urls && mediaItem.urls.medium ? mediaItem.urls.medium : mediaItem.url,
+                    url: resolveMediaPreviewUrl(mediaItem),
                     alt: mediaItem.alt,
                     filename: mediaItem.filename,
                 });
@@ -309,6 +333,32 @@
                 });
             });
         }
+
+        root.__galleryApi = {
+            getItems: function () {
+                return items.map(function (item) {
+                    return {
+                        linkId: item.linkId,
+                        mediaId: item.mediaId,
+                        url: item.url,
+                        alt: item.alt,
+                        filename: item.filename,
+                    };
+                });
+            },
+            setItems: function (nextItems) {
+                items = (nextItems || []).map(function (item) {
+                    return {
+                        linkId: item.linkId || null,
+                        mediaId: item.mediaId,
+                        url: item.url,
+                        alt: item.alt,
+                        filename: item.filename,
+                    };
+                });
+                renderAll();
+            },
+        };
 
         renderAll();
 
@@ -342,4 +392,8 @@
     }
 
     document.querySelectorAll('.admin-product-gallery').forEach(initGallery);
+
+    window.AdminProductGallery = {
+        init: initGallery,
+    };
 })();

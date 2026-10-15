@@ -348,7 +348,7 @@ class CatalogController extends ApiController
      *     path="/api/v1/catalog/library-fabrics",
      *     tags={"Каталог"},
      *     summary="Листинг тканей для страницы библиотеки",
-     *     description="Активные рекомендуемые цветодизайны (is_recommended_fabric). В каждом item — composition и martindale коллекции. Сортировка по position_number, затем по label (api_label / design_code). В meta.texturesArchiveUrl — абсолютная ссылка на ZIP фото библиотеки, если архив уже собран. Публичный GET без авторизации.",
+     *     description="Активные рекомендуемые цветодизайны (is_recommended_fabric). В каждом item: swatch — основное фото образца; additionalPhotos[] — доп. фото только для библиотеки (из админки коллекции ткани); composition и martindale коллекции. Сортировка по position_number, затем по label (api_label / design_code). В meta.texturesArchiveUrl — абсолютная ссылка на ZIP фото библиотеки, если архив уже собран. Публичный GET без авторизации.",
      *     @OA\Parameter(name="q", in="query", required=false, @OA\Schema(type="string")),
      *     @OA\Parameter(name="texture", in="query", required=false, @OA\Schema(type="string")),
      *     @OA\Parameter(name="color", in="query", required=false, @OA\Schema(type="string")),

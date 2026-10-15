@@ -83,7 +83,7 @@ class CatalogLibraryFabricsService
                 ['fcol' => '{{%catalog_fabric_collections}}'],
                 'fcol.id = fc.fabric_collection_id AND fcol.is_active = 1'
             )
-            ->with(['fabricCollection', 'catalogColor', 'swatchMedia', 'colorImages.media'])
+            ->with(['fabricCollection', 'catalogColor', 'swatchMedia', 'colorImages.media', 'libraryPhotos.media'])
             ->where(['fc.is_active' => true, 'fc.is_recommended_fabric' => true]);
 
         if ($q !== '') {
@@ -175,6 +175,7 @@ class CatalogLibraryFabricsService
             'positionNumber' => $fabric->position_number !== null ? (int)$fabric->position_number : null,
             'description' => $fabric->getDescriptionForApi(),
             'swatch' => $swatches[0] ?? null,
+            'additionalPhotos' => $fabric->collectLibraryPhotosApiPayload(),
         ];
     }
 }
