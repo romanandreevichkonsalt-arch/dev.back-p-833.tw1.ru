@@ -594,6 +594,8 @@ class CatalogModel extends ActiveRecord
     }
 
     /**
+     * Фото purpose=interior — только API мудборда (moodboardPhotos), не карточка товара.
+     *
      * @return array<int, array{src: string, alt: string}>
      */
     public function getInteriorImagesApiPayload(): array
@@ -683,7 +685,6 @@ class CatalogModel extends ActiveRecord
         }
 
         $video = $this->video;
-        $interiorImages = $this->getInteriorImagesApiPayload();
         $dimensionImages = $this->getDimensionImagesApiPayload();
 
         $prices = [];
@@ -715,7 +716,6 @@ class CatalogModel extends ActiveRecord
             'dimensions' => $this->getDimensionsApiPayload(),
             'materials' => $this->getMaterialsApiPayload(),
             'modelImages' => $this->getImagesApiPayload(),
-            'modelInteriorImages' => $interiorImages !== [] ? $interiorImages : null,
             'dimensionImages' => $dimensionImages !== [] ? $dimensionImages : null,
             'techPhotosFolderUrl' => $this->tech_photos_folder_url ?: null,
             'prices' => $prices !== [] ? $prices : null,

@@ -250,7 +250,6 @@ class CatalogService
                 'catalogModel.layout',
                 'catalogModel.video',
                 'catalogModel.modelImages.media',
-                'catalogModel.modelInteriorImages.media',
                 'catalogModel.modelDimensionImages.media',
                 'fabricColor.catalogColor.colorImages.media',
                 'fabricColor.catalogColor.swatchMedia',

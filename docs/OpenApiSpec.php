@@ -656,14 +656,6 @@ use OpenApi\Annotations as OA;
  *         @OA\Items(ref="#/components/schemas/CatalogImage")
  *     ),
  *     @OA\Property(
- *         property="modelInteriorImages",
- *         type="array",
- *         nullable=true,
- *         title="фото в интерьере",
- *         description="фото модели в интерьере; null, если галерея пустая",
- *         @OA\Items(ref="#/components/schemas/CatalogImage")
- *     ),
- *     @OA\Property(
  *         property="dimensionImages",
  *         type="array",
  *         nullable=true,
@@ -768,14 +760,6 @@ use OpenApi\Annotations as OA;
  *         nullable=true,
  *         title="ракурсы модели",
  *         description="ракурсы модели; поле есть только у SKU из модели (может быть пустым массивом)",
- *         @OA\Items(ref="#/components/schemas/CatalogImage")
- *     ),
- *     @OA\Property(
- *         property="modelInteriorImages",
- *         type="array",
- *         nullable=true,
- *         title="фото в интерьере",
- *         description="фото модели в интерьере; поле есть, только если галерея не пустая",
  *         @OA\Items(ref="#/components/schemas/CatalogImage")
  *     ),
  *     @OA\Property(
@@ -933,17 +917,6 @@ use OpenApi\Annotations as OA;
  *                             }
  *                         }
  *                     },
- *                     "modelInteriorImages"={
- *                         {
- *                             "src"="модель · фото в интерьере, URL medium из медиатеки",
- *                             "alt"="медиатека · альтернативный текст",
- *                             "srcSet"={
- *                                 "mini"="медиатека · URL миниатюры (до 200px)",
- *                                 "medium"="медиатека · URL medium (до 1200px)",
- *                                 "original"="медиатека · URL оригинала"
- *                             }
- *                         }
- *                     },
  *                     "dimensionImages"={
  *                         {
  *                             "src"="модель · тех.фото габаритов, URL medium из медиатеки",
@@ -965,17 +938,6 @@ use OpenApi\Annotations as OA;
  *                 "modelImages"={
  *                     {
  *                         "src"="модель · ракурс, URL medium из медиатеки",
- *                         "alt"="медиатека · альтернативный текст",
- *                         "srcSet"={
- *                             "mini"="медиатека · URL миниатюры (до 200px)",
- *                             "medium"="медиатека · URL medium (до 1200px)",
- *                             "original"="медиатека · URL оригинала"
- *                         }
- *                     }
- *                 },
- *                 "modelInteriorImages"={
- *                     {
- *                         "src"="модель · фото в интерьере, URL medium из медиатеки",
  *                         "alt"="медиатека · альтернативный текст",
  *                         "srcSet"={
  *                             "mini"="медиатека · URL миниатюры (до 200px)",

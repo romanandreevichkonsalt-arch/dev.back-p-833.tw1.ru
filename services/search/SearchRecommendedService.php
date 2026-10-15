@@ -547,7 +547,6 @@ class SearchRecommendedService
             'catalogProduct.catalogModel.layout',
             'catalogProduct.catalogModel.video',
             'catalogProduct.catalogModel.modelImages.media',
-            'catalogProduct.catalogModel.modelInteriorImages.media',
             'catalogProduct.catalogModel.modelDimensionImages.media',
             'catalogProduct.fabricColor.catalogColor.swatchMedia',
             'catalogProduct.fabricColor.fabricCollection',

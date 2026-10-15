@@ -428,15 +428,10 @@ class CatalogProduct extends ActiveRecord
 
         $video = $this->video;
         $modelImages = null;
-        $modelInteriorImages = null;
         $dimensionImages = null;
         if ($this->isGeneratedFromModel() && $this->catalogModel !== null) {
             $video = $this->catalogModel->video ?? $video;
             $modelImages = $this->catalogModel->getImagesApiPayload();
-            $interior = $this->catalogModel->getInteriorImagesApiPayload();
-            if ($interior !== []) {
-                $modelInteriorImages = $interior;
-            }
             $dimensionImages = $this->catalogModel->getDimensionImagesApiPayload();
         }
 
@@ -479,9 +474,6 @@ class CatalogProduct extends ActiveRecord
 
         if ($modelImages !== null) {
             $item['modelImages'] = $modelImages;
-        }
-        if ($modelInteriorImages !== null) {
-            $item['modelInteriorImages'] = $modelInteriorImages;
         }
         if ($dimensionImages !== null && $dimensionImages !== []) {
             $item['dimensionImages'] = $dimensionImages;
