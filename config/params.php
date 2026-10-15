@@ -2,6 +2,35 @@
 
 $receiptDestinationEmail = trim(getenv('YOOKASSA_RECEIPT_EMAIL') ?: 'tania22gerasimenko@gmail.com');
 
+$corsOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://dev.back-p-833.tw1.ru',
+    'https://dev.front-p-833.tw1.ru',
+    'https://dev-fabrika.ru',
+    'https://www.dev-fabrika.ru',
+];
+
+$appendCorsOrigin = static function (string $url) use (&$corsOrigins): void {
+    $url = trim($url);
+    if ($url === '') {
+        return;
+    }
+    $corsOrigins[] = rtrim($url, '/');
+};
+
+$appendCorsOrigin(getenv('FRONTEND_URL') ?: '');
+
+$corsExtra = trim(getenv('CORS_ORIGINS') ?: '');
+if ($corsExtra !== '') {
+    foreach (preg_split('/[\s,]+/', $corsExtra, -1, PREG_SPLIT_NO_EMPTY) as $origin) {
+        $appendCorsOrigin($origin);
+    }
+}
+
+$corsOrigins = array_values(array_unique($corsOrigins));
+
 return [
     'adminEmail' => 'admin@example.com',
     'senderEmail' => 'noreply@example.com',
@@ -97,13 +126,7 @@ return [
         'searchIndexHardTtl' => 86400,
         'pageTtl' => 900,
     ],
-    'corsOrigins' => [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://dev.back-p-833.tw1.ru',
-        'https://dev.front-p-833.tw1.ru',
-    ],
+    'corsOrigins' => $corsOrigins,
     'smsCodeTtl' => 60,
     'smsCodeLength' => 4,
     'yandexId' => [
