@@ -106,6 +106,14 @@ $filterSelectOptions = [
         <thead>
         <tr>
             <th>Название</th>
+            <th class="admin-table-col--icon">
+                <?= Html::activeDropDownList(
+                    $searchModel,
+                    'is_active',
+                    ['' => 'Все'] + CatalogModelSearch::activeOptions(),
+                    $filterSelectOptions
+                ) ?>
+            </th>
             <th>
                 <?= Html::activeDropDownList(
                     $searchModel,
@@ -144,7 +152,7 @@ $filterSelectOptions = [
         <tbody>
         <?php if ($models === []): ?>
             <tr>
-                <td colspan="6">Моделей пока нет.</td>
+                <td colspan="7">Моделей пока нет.</td>
             </tr>
         <?php endif; ?>
         <?php foreach ($models as $model): ?>
@@ -154,6 +162,7 @@ $filterSelectOptions = [
                         <?= Html::encode($model->title) ?>
                     </div>
                 </td>
+                <td class="admin-table-col--icon"><?= AdminHtml::catalogModelActiveIcon((bool)$model->is_active) ?></td>
                 <td><?= Html::encode($model->collection?->direction?->label ?? '—') ?></td>
                 <td><?= Html::encode($model->collection?->getDisplayName() ?? '—') ?></td>
                 <td><?= Html::encode($model->subcategory?->label ?? '—') ?></td>

@@ -2,6 +2,7 @@
 
 namespace app\commands;
 
+use app\services\media\ListingFrameBatchReapplier;
 use app\services\media\MediaVariantRegenerator;
 use yii\console\Controller;
 use yii\console\ExitCode;
@@ -13,7 +14,7 @@ class MediaController extends Controller
     public function options($actionID): array
     {
         $options = parent::options($actionID);
-        if ($actionID === 'regenerate-variants') {
+        if ($actionID === 'regenerate-variants' || $actionID === 'reapply-listing-frames') {
             $options[] = 'dryRun';
         }
 
@@ -36,6 +37,27 @@ class MediaController extends Controller
             "Regenerate finished: processed=%d regenerated=%d skipped=%d failed=%d%s\n",
             $result['processed'],
             $result['regenerated'],
+            $result['skipped'],
+            $result['failed'],
+            $this->dryRun ? ' (dry-run)' : ''
+        ));
+
+        foreach ($result['messages'] as $message) {
+            $this->stdout('  ' . $message . "\n");
+        }
+
+        return ($result['failed'] ?? 0) > 0 ? ExitCode::UNSPECIFIED_ERROR : ExitCode::OK;
+    }
+
+    public function actionReapplyListingFrames(): int
+    {
+        $service = new ListingFrameBatchReapplier();
+        $result = $service->reapplyAllLocked($this->dryRun);
+
+        $this->stdout(sprintf(
+            "Reapply listing frames finished: processed=%d reapplied=%d skipped=%d failed=%d%s\n",
+            $result['processed'],
+            $result['reapplied'],
             $result['skipped'],
             $result['failed'],
             $this->dryRun ? ' (dry-run)' : ''

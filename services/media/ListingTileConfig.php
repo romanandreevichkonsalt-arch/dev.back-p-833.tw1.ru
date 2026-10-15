@@ -12,6 +12,7 @@ final class ListingTileConfig
         public readonly string $backgroundHex = '#fcfbf2',
         public readonly int $floorGuideFromBottom = 75,
         public readonly int $miniMaxWidth = 200,
+        public readonly int $mediumExportMaxWidth = 1200,
         public readonly int $webpQuality = 90,
     ) {
     }
@@ -30,13 +31,16 @@ final class ListingTileConfig
             // Таблица ещё не создана — используем значение из params.
         }
 
+        $variantParams = \Yii::$app->params['mediaImageVariants'] ?? [];
+
         return new self(
             width: $width,
             height: $height,
             backgroundHex: (string)($config['background'] ?? '#fcfbf2'),
             floorGuideFromBottom: max(0, min(max(0, $height - 1), $floorGuide)),
-            miniMaxWidth: (int)($config['miniMaxWidth'] ?? (\Yii::$app->params['mediaImageVariants']['miniMaxWidth'] ?? 200)),
-            webpQuality: (int)($config['webpQuality'] ?? (\Yii::$app->params['mediaImageVariants']['webpQuality'] ?? 90)),
+            miniMaxWidth: (int)($config['miniMaxWidth'] ?? ($variantParams['miniMaxWidth'] ?? 200)),
+            mediumExportMaxWidth: (int)($variantParams['mediumMaxWidth'] ?? 1200),
+            webpQuality: (int)($config['webpQuality'] ?? ($variantParams['webpQuality'] ?? 90)),
         );
     }
 
@@ -61,5 +65,16 @@ final class ListingTileConfig
         }
 
         return (int)max(1, round($this->height * ($width / $this->width)));
+    }
+
+    /** Размер экспорта listing medium — тот же max-width, что у авто-варианта _m. */
+    public function mediumExportWidth(): int
+    {
+        return max(1, $this->mediumExportMaxWidth);
+    }
+
+    public function mediumExportHeight(): int
+    {
+        return $this->miniHeightForWidth($this->mediumExportWidth());
     }
 }

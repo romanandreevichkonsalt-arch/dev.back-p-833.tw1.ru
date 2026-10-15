@@ -565,7 +565,7 @@ class CatalogProduct extends ActiveRecord
             'category' => $category,
             'subcategory' => $subcategory,
             'collection' => $collection,
-            'image' => $this->resolvePrimaryImagePayload(),
+            'image' => $this->resolvePrimaryImagePayload(forListing: true),
             'polygons_3d' => $polygons3d,
             'file_3d_url' => $file3dUrl,
             'badge' => $badge,

@@ -24,15 +24,26 @@ class ListingTileRendererTest extends Unit
         imagepng($source, $sourcePath);
         imagedestroy($source);
 
-        $config = new ListingTileConfig(width: 458, height: 347, backgroundHex: '#fcfbf2');
+        $config = new ListingTileConfig(
+            width: 458,
+            height: 347,
+            backgroundHex: '#fcfbf2',
+            mediumExportMaxWidth: 1200,
+        );
         $renderer = new ListingTileRenderer($config);
-        $renderer->renderFile($sourcePath, ListingFrameData::defaults(), $targetPath);
+        $renderer->renderFile(
+            $sourcePath,
+            ListingFrameData::defaults(),
+            $targetPath,
+            $config->mediumExportWidth(),
+            $config->mediumExportHeight(),
+        );
 
         verify(is_file($targetPath))->true();
         $info = getimagesize($targetPath);
         verify($info)->notNull();
-        verify($info[0])->equals(458);
-        verify($info[1])->equals(347);
+        verify($info[0])->equals(1200);
+        verify($info[1])->equals($config->mediumExportHeight());
 
         @unlink($sourcePath);
         @unlink($targetPath);

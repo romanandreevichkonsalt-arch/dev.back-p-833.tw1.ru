@@ -1888,7 +1888,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="category", ref="#/components/schemas/CatalogLibraryTaxonomyRef", nullable=true),
  *     @OA\Property(property="subcategory", ref="#/components/schemas/CatalogLibraryTaxonomyRef", nullable=true),
  *     @OA\Property(property="collection", ref="#/components/schemas/CatalogLibraryCollectionRef", nullable=true),
- *     @OA\Property(property="image", ref="#/components/schemas/CatalogImage", description="Первое фото SKU"),
+ *     @OA\Property(property="image", ref="#/components/schemas/CatalogImage", description="Первое фото SKU; src — кадр редактора модели (_listing_m), если есть, иначе auto medium"),
  *     @OA\Property(property="polygons_3d", type="string", nullable=true, description="Количество полигонов модели"),
  *     @OA\Property(property="file_3d_url", type="string", nullable=true, description="Публичный URL сохранённого файла 3D из медиатеки (file_3d_id), не внешняя ссылка"),
  *     @OA\Property(property="badge", ref="#/components/schemas/CatalogBadge", nullable=true)

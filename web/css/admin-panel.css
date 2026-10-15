@@ -1693,6 +1693,17 @@ body.admin-modal-open {
     padding: 6px 8px;
 }
 
+.admin-table-col--icon {
+    width: 1%;
+    white-space: nowrap;
+    text-align: center;
+}
+
+.admin-table-col--icon .admin-table-header-filter {
+    min-width: 96px;
+    max-width: 120px;
+}
+
 .admin-filter-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

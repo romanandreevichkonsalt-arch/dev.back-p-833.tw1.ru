@@ -12,11 +12,43 @@ final class ListingTileRenderer
     /**
      * @throws \RuntimeException
      */
-    public function renderFile(string $sourcePath, ListingFrameData $frame, string $targetPath): void
-    {
-        $canvas = $this->renderCanvas($sourcePath, $frame, $this->config->width, $this->config->height);
+    public function renderFile(
+        string $sourcePath,
+        ListingFrameData $frame,
+        string $targetPath,
+        ?int $targetWidth = null,
+        ?int $targetHeight = null,
+    ): void {
+        $targetWidth ??= $this->config->width;
+        $targetHeight ??= $this->config->height;
+        $frame = $this->frameForTargetCanvas($frame, $targetWidth, $targetHeight);
+        $canvas = $this->renderCanvas($sourcePath, $frame, $targetWidth, $targetHeight);
         $this->saveCanvas($canvas, $targetPath, $this->config->webpQuality);
         imagedestroy($canvas);
+    }
+
+    private function frameForTargetCanvas(
+        ListingFrameData $frame,
+        int $targetWidth,
+        int $targetHeight,
+    ): ListingFrameData {
+        if ($targetWidth === $this->config->width && $targetHeight === $this->config->height) {
+            return $frame;
+        }
+
+        if ($this->config->width <= 0 || $this->config->height <= 0) {
+            return $frame;
+        }
+
+        $scaleX = $targetWidth / $this->config->width;
+        $scaleY = $targetHeight / $this->config->height;
+
+        return new ListingFrameData(
+            scale: $frame->scale,
+            offsetX: $frame->offsetX * $scaleX,
+            offsetY: $frame->offsetY * $scaleY,
+            version: $frame->version,
+        );
     }
 
     /**

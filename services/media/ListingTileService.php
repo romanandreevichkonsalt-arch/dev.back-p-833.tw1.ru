@@ -35,7 +35,13 @@ final class ListingTileService
         $mediumPath = $this->resolveListingVariantFullPath($media, 'medium');
         $miniPath = $this->resolveListingVariantFullPath($media, 'mini');
 
-        $this->renderer->renderFile($originalPath, $frame, $mediumPath);
+        $this->renderer->renderFile(
+            $originalPath,
+            $frame,
+            $mediumPath,
+            $this->config->mediumExportWidth(),
+            $this->config->mediumExportHeight(),
+        );
 
         $miniWidth = $this->config->miniMaxWidth;
         $miniHeight = $this->config->miniHeightForWidth($miniWidth);

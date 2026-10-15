@@ -18,11 +18,13 @@ class CatalogModelSearch extends Model
     public ?string $collection_id = null;
     public ?string $subcategory_id = null;
     public ?string $color_id = null;
+    public ?string $is_active = null;
 
     public function rules(): array
     {
         return [
             [['direction_id', 'collection_id', 'subcategory_id', 'color_id'], 'integer'],
+            [['is_active'], 'in', 'range' => ['0', '1']],
         ];
     }
 
@@ -33,6 +35,7 @@ class CatalogModelSearch extends Model
             'collection_id' => 'Коллекция',
             'subcategory_id' => 'Подкатегория',
             'color_id' => 'Цвет',
+            'is_active' => 'Активна',
         ];
     }
 
@@ -64,6 +67,10 @@ class CatalogModelSearch extends Model
 
         $query->andFilterWhere(['m.collection_id' => $this->collection_id]);
         $query->andFilterWhere(['m.subcategory_id' => $this->subcategory_id]);
+
+        if ($this->is_active !== null && $this->is_active !== '') {
+            $query->andWhere(['m.is_active' => (int)$this->is_active]);
+        }
 
         if ($this->direction_id !== null && $this->direction_id !== '') {
             $query->andWhere([
@@ -124,6 +131,21 @@ class CatalogModelSearch extends Model
                 $this->color_id = null;
             }
         }
+
+        if ($this->is_active !== null && $this->is_active !== '' && !in_array($this->is_active, ['0', '1'], true)) {
+            $this->is_active = null;
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function activeOptions(): array
+    {
+        return [
+            1 => 'Активные',
+            0 => 'Неактивные',
+        ];
     }
 
     /**
