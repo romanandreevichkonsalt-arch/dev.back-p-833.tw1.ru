@@ -203,6 +203,7 @@ class FabricImportRunService
     public function getStatusPayload(int $runId): array
     {
         $run = $this->findRun($runId);
+        $this->recoverFalseAwaitingConflictForSkipMode($run);
         $this->syncAwaitingConflictFromStats($run);
         $this->ensureRunCompleted($run);
         $this->maybeRedispatchStalledWorker($run);
@@ -267,6 +268,38 @@ class FabricImportRunService
         $run->save(false, ['status', 'phase', 'phase_message', 'finished_at']);
     }
 
+    /**
+     * Старые прогоны: pending_conflict оставался в stats при авто-пропуске дубликатов.
+     */
+    private function recoverFalseAwaitingConflictForSkipMode(CatalogImportRun $run): void
+    {
+        if ($run->status !== CatalogImportRun::STATUS_AWAITING_CONFLICT) {
+            return;
+        }
+
+        $payload = $run->getStats();
+        if (!empty($payload['aborted'])) {
+            return;
+        }
+
+        $runOptions = $run->getOptions();
+        if (($runOptions['conflict_resolution'] ?? '') !== FabricRegistryImportOptions::CONFLICT_SKIP) {
+            return;
+        }
+
+        $payload['pending_conflict'] = null;
+        $run->setStats($payload);
+        $run->status = CatalogImportRun::STATUS_QUEUED;
+        $run->phase = CatalogImportRun::PHASE_QUEUED;
+        $run->phase_message = 'Продолжение импорта…';
+        $run->finished_at = null;
+        if ((int)$run->resume_row_index <= 0 && (int)$run->processed_rows > 0) {
+            $run->resume_row_index = (int)$run->processed_rows;
+        }
+        $run->save(false);
+        $this->dispatchWorker((int)$run->id);
+    }
+
     private function syncAwaitingConflictFromStats(CatalogImportRun $run): void
     {
         if ($run->status !== CatalogImportRun::STATUS_PROCESSING) {
@@ -275,6 +308,10 @@ class FabricImportRunService
 
         $payload = $run->getStats();
         if (empty($payload['pending_conflict']) || !is_array($payload['pending_conflict'])) {
+            return;
+        }
+
+        if (empty($payload['aborted'])) {
             return;
         }
 

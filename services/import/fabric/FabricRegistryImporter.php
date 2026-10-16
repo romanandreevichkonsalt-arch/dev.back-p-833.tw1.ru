@@ -104,6 +104,7 @@ class FabricRegistryImporter
                         $result->stats['links_conflict'] = max(0, $result->stats['links_conflict'] - 1);
                         $rowResult->action = FabricRegistryImportRowResult::ACTION_SKIP;
                         $rowResult->addMessage('Пара коллекция-цвет уже есть — пропущена.');
+                        $result->pendingConflict = null;
                         $this->updateStats($result, $rowResult);
                         $this->clearConflictResolutionOnce($options, $importRun);
                         continue;
@@ -116,6 +117,7 @@ class FabricRegistryImporter
                             $result->stats['links_updated']++;
                             $result->stats['links_conflict'] = max(0, $result->stats['links_conflict'] - 1);
                         }
+                        $result->pendingConflict = null;
                         $this->clearConflictResolutionOnce($options, $importRun);
                     }
                 }
@@ -258,6 +260,13 @@ class FabricRegistryImporter
         }
 
         if ($existingLink !== null && !$options->updateExisting && $options->resolveConflictAction() !== FabricRegistryImportOptions::CONFLICT_UPDATE) {
+            if ($options->resolveConflictAction() === FabricRegistryImportOptions::CONFLICT_SKIP) {
+                $rowResult->action = FabricRegistryImportRowResult::ACTION_SKIP;
+                $rowResult->addMessage('Пара коллекция-цвет уже есть — пропущена.');
+
+                return $rowResult;
+            }
+
             $rowResult->action = FabricRegistryImportRowResult::ACTION_CONFLICT;
             $rowResult->conflict = [
                 'row_number' => $row->rowNumber,

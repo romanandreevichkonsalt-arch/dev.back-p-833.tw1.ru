@@ -102,6 +102,7 @@ class SurfaceMaterialRegistryImporter
                         $result->stats['links_conflict'] = $result->stats['materials_conflict'];
                         $rowResult->action = SurfaceMaterialRegistryImportRowResult::ACTION_SKIP;
                         $rowResult->addMessage('Материал уже есть — пропущен.');
+                        $result->pendingConflict = null;
                         $this->updateStats($result, $rowResult);
                         $this->clearConflictResolutionOnce($options, $importRun);
                         continue;
@@ -116,6 +117,7 @@ class SurfaceMaterialRegistryImporter
                             $result->stats['materials_conflict'] = max(0, $result->stats['materials_conflict'] - 1);
                             $result->stats['links_conflict'] = $result->stats['materials_conflict'];
                         }
+                        $result->pendingConflict = null;
                         $this->clearConflictResolutionOnce($options, $importRun);
                     }
                 }
@@ -191,6 +193,13 @@ class SurfaceMaterialRegistryImporter
             ->one();
 
         if ($existing !== null && !$options->updateExisting && $options->resolveConflictAction() !== SurfaceMaterialRegistryImportOptions::CONFLICT_UPDATE) {
+            if ($options->resolveConflictAction() === SurfaceMaterialRegistryImportOptions::CONFLICT_SKIP) {
+                $rowResult->action = SurfaceMaterialRegistryImportRowResult::ACTION_SKIP;
+                $rowResult->addMessage('Материал уже есть — пропущен.');
+
+                return $rowResult;
+            }
+
             $rowResult->action = SurfaceMaterialRegistryImportRowResult::ACTION_CONFLICT;
             $rowResult->conflict = [
                 'row_number' => $row->rowNumber,
