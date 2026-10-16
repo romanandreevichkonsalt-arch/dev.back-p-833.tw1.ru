@@ -148,6 +148,19 @@ use yii\widgets\ActiveForm;
     <?php ActiveForm::end(); ?>
 </div>
 
+<div data-fabric-collection-delete-root>
+    <div class="admin-import-loader admin-import-loader--corner" data-fabric-collection-delete-loader hidden role="status" aria-live="polite" aria-label="Удаление коллекции">
+        <div class="admin-import-loader__panel">
+            <span class="admin-import-loader__spinner" data-fabric-collection-delete-spinner aria-hidden="true"></span>
+            <span class="admin-import-loader__success" data-fabric-collection-delete-success hidden aria-hidden="true"></span>
+            <p class="admin-import-loader__text" data-fabric-collection-delete-text>Удаление…</p>
+            <div class="admin-import-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="admin-import-progress__bar" data-fabric-collection-delete-bar style="width: 0%"></div>
+            </div>
+            <p class="admin-import-loader__hint admin-muted" data-fabric-collection-delete-stats></p>
+        </div>
+    </div>
+
 <div class="admin-card">
     <table class="admin-table">
         <thead>
@@ -199,10 +212,8 @@ use yii\widgets\ActiveForm;
                 <td class="admin-table-actions">
                     <?= AdminHtml::actionIcon(['update', 'id' => $collection->id], 'update') ?>
                     <?= AdminHtml::actionIcon(['delete', 'id' => $collection->id], 'delete', [
-                        'data' => [
-                            'method' => 'post',
-                            'confirm' => $deleteConfirm,
-                        ],
+                        'data-fabric-collection-delete' => '1',
+                        'data-confirm' => $deleteConfirm,
                     ]) ?>
                 </td>
             </tr>
@@ -210,8 +221,14 @@ use yii\widgets\ActiveForm;
         </tbody>
     </table>
 </div>
+</div>
 <?php
 $this->registerJsFile('@web/js/admin-fabric-import.js', [
+    'depends' => [\app\modules\admin\assets\AdminAsset::class],
+    'position' => View::POS_END,
+    'appendTimestamp' => true,
+]);
+$this->registerJsFile('@web/js/admin-fabric-collection-delete.js', [
     'depends' => [\app\modules\admin\assets\AdminAsset::class],
     'position' => View::POS_END,
     'appendTimestamp' => true,

@@ -23,6 +23,8 @@ use app\services\import\fabric\FabricRegistryImportResult;
 use app\services\import\fabric\FabricRegistryImportRowResult;
 use app\modules\admin\models\FabricCollectionSearch;
 use Yii;
+use yii\helpers\Url;
+use yii\web\BadRequestHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\ServerErrorHttpException;
@@ -43,6 +45,8 @@ class FabricCollectionController extends BaseController
 
     public const TAB_COLLECTIONS = 'collections';
     public const TAB_CATEGORIES = 'categories';
+
+    private const FABRIC_COLLECTION_DELETE_BATCH_SIZE = 40;
 
     public function actionIndex(): string
     {
@@ -179,8 +183,20 @@ class FabricCollectionController extends BaseController
         ]));
     }
 
-    public function actionDelete(int $id): Response
+    public function actionDelete(int $id): Response|array
     {
+        $stage = (string)Yii::$app->request->post('stage', '');
+        if ($this->isFabricCollectionDeleteAjax() && $stage !== '') {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+
+            return match ($stage) {
+                'batch' => $this->fabricCollectionDeleteBatch($id),
+                'finalize' => $this->fabricCollectionDeleteFinalize($id),
+                'sync' => $this->fabricCollectionDeleteSync($id),
+                default => throw new BadRequestHttpException('Неизвестный этап удаления.'),
+            };
+        }
+
         $model = $this->findModel($id);
         $syncService = Yii::$container->get(CatalogModelProductSyncService::class);
 
@@ -188,10 +204,7 @@ class FabricCollectionController extends BaseController
             ->select('id')
             ->where(['fabric_collection_id' => $model->id])
             ->column();
-        $modelIds = Yii::$app->db->createCommand(
-            'SELECT model_id FROM {{%catalog_model_fabric_collections}} WHERE fabric_collection_id = :fc',
-            ['fc' => (int)$model->id]
-        )->queryColumn();
+        $modelIds = $this->linkedModelIdsForFabricCollection((int)$model->id);
 
         $deletedProducts = $syncService->deleteProductsForFabricColorIds($colorIds);
         $model->delete();
@@ -204,13 +217,231 @@ class FabricCollectionController extends BaseController
         }
 
         ApiCacheInvalidator::touch();
+        $message = $this->fabricCollectionDeletedMessage($deletedProducts);
+        Yii::$app->session->setFlash('success', $message);
+
+        return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS]);
+    }
+
+    private function isFabricCollectionDeleteAjax(): bool
+    {
+        return Yii::$app->request->isAjax
+            || Yii::$app->request->headers->get('X-Requested-With') === 'XMLHttpRequest';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fabricCollectionDeleteBatch(int $id): array
+    {
+        $state = $this->loadFabricCollectionDeleteState($id);
+        if ($state === null) {
+            $model = $this->findModel($id);
+            $colorIds = CatalogFabricColor::find()
+                ->select('id')
+                ->where(['fabric_collection_id' => $model->id])
+                ->column();
+            $syncService = Yii::$container->get(CatalogModelProductSyncService::class);
+            $state = [
+                'collection_name' => (string)$model->name,
+                'color_ids' => array_map('intval', $colorIds),
+                'model_ids' => $this->linkedModelIdsForFabricCollection((int)$model->id),
+                'total_products' => $syncService->countProductsForFabricColorIds($colorIds),
+                'sync_index' => 0,
+            ];
+            $this->saveFabricCollectionDeleteState($id, $state);
+        }
+
+        $syncService = Yii::$container->get(CatalogModelProductSyncService::class);
+        $deletedInBatch = $syncService->deleteProductBatchForFabricColorIds(
+            $state['color_ids'],
+            self::FABRIC_COLLECTION_DELETE_BATCH_SIZE
+        );
+        $remaining = $syncService->countProductsForFabricColorIds($state['color_ids']);
+
+        return [
+            'totalProducts' => (int)$state['total_products'],
+            'deletedInBatch' => $deletedInBatch,
+            'needsFinalize' => $remaining === 0,
+            'message' => $remaining === 0
+                ? 'Товары удалены, удаление коллекции…'
+                : 'Удаление связанных товаров (SKU)…',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fabricCollectionDeleteFinalize(int $id): array
+    {
+        $state = $this->loadFabricCollectionDeleteState($id);
+        if ($state === null) {
+            throw new BadRequestHttpException('Сессия удаления истекла. Обновите страницу.');
+        }
+
+        $model = CatalogFabricCollection::findOne($id);
+        if ($model === null) {
+            $this->clearFabricCollectionDeleteState($id);
+
+            return $this->fabricCollectionDeleteDonePayload(
+                (int)Yii::$app->request->post('deletedProducts', 0),
+                (string)$state['collection_name']
+            );
+        }
+
+        $syncService = Yii::$container->get(CatalogModelProductSyncService::class);
+        $syncService->deleteProductsForFabricColorIds($state['color_ids']);
+        $model->delete();
+
+        ApiCacheInvalidator::touch();
+
+        $deletedProducts = (int)Yii::$app->request->post('deletedProducts', 0);
+        $modelIds = $state['model_ids'];
+        $state['sync_index'] = 0;
+        $state['deleted_products'] = $deletedProducts;
+        $this->saveFabricCollectionDeleteState($id, $state);
+
+        if ($modelIds === []) {
+            $this->clearFabricCollectionDeleteState($id);
+            Yii::$app->session->setFlash('success', $this->fabricCollectionDeletedMessage($deletedProducts));
+
+            return $this->fabricCollectionDeleteDonePayload($deletedProducts, (string)$state['collection_name']);
+        }
+
+        return [
+            'needsSync' => true,
+            'totalModels' => count($modelIds),
+            'syncedModels' => 0,
+            'done' => false,
+            'message' => 'Синхронизация каталога…',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fabricCollectionDeleteSync(int $id): array
+    {
+        $state = $this->loadFabricCollectionDeleteState($id);
+        if ($state === null) {
+            throw new BadRequestHttpException('Сессия удаления истекла. Обновите страницу.');
+        }
+
+        $modelIds = $state['model_ids'];
+        $syncIndex = (int)$state['sync_index'];
+        $syncService = Yii::$container->get(CatalogModelProductSyncService::class);
+
+        if ($syncIndex < count($modelIds)) {
+            $catalogModel = CatalogModel::findOne((int)$modelIds[$syncIndex]);
+            if ($catalogModel !== null) {
+                $syncService->syncForModel($catalogModel);
+            }
+            $syncIndex++;
+            $state['sync_index'] = $syncIndex;
+            $this->saveFabricCollectionDeleteState($id, $state);
+        }
+
+        $done = $syncIndex >= count($modelIds);
+        if ($done) {
+            $deletedProducts = (int)($state['deleted_products'] ?? 0);
+            $this->clearFabricCollectionDeleteState($id);
+            Yii::$app->session->setFlash('success', $this->fabricCollectionDeletedMessage($deletedProducts));
+
+            return [
+                'done' => true,
+                'needsSync' => false,
+                'totalModels' => count($modelIds),
+                'syncedModels' => $syncIndex,
+                'message' => 'Коллекция удалена',
+                'redirect' => Url::to(['index', 'tab' => self::TAB_COLLECTIONS]),
+            ];
+        }
+
+        return [
+            'done' => false,
+            'needsSync' => true,
+            'totalModels' => count($modelIds),
+            'syncedModels' => $syncIndex,
+            'message' => 'Синхронизация каталога…',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fabricCollectionDeleteDonePayload(int $deletedProducts, string $collectionName): array
+    {
+        return [
+            'done' => true,
+            'needsSync' => false,
+            'message' => 'Коллекция «' . $collectionName . '» удалена',
+            'redirect' => Url::to(['index', 'tab' => self::TAB_COLLECTIONS]),
+            'deletedProducts' => $deletedProducts,
+        ];
+    }
+
+    private function fabricCollectionDeletedMessage(int $deletedProducts): string
+    {
         $message = 'Коллекция удалена.';
         if ($deletedProducts > 0) {
             $message .= ' Удалено товаров (SKU): ' . $deletedProducts . '.';
         }
-        Yii::$app->session->setFlash('success', $message);
 
-        return $this->redirect(['index']);
+        return $message;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function linkedModelIdsForFabricCollection(int $fabricCollectionId): array
+    {
+        return array_map(
+            'intval',
+            Yii::$app->db->createCommand(
+                'SELECT model_id FROM {{%catalog_model_fabric_collections}} WHERE fabric_collection_id = :fc',
+                ['fc' => $fabricCollectionId]
+            )->queryColumn()
+        );
+    }
+
+    private function fabricCollectionDeleteSessionKey(int $id): string
+    {
+        return 'fabric_collection_delete_' . $id;
+    }
+
+    /**
+     * @return array{
+     *   collection_name: string,
+     *   color_ids: list<int>,
+     *   model_ids: list<int>,
+     *   total_products: int,
+     *   sync_index: int,
+     * }|null
+     */
+    private function loadFabricCollectionDeleteState(int $id): ?array
+    {
+        $state = Yii::$app->session->get($this->fabricCollectionDeleteSessionKey($id));
+
+        return is_array($state) ? $state : null;
+    }
+
+    /**
+     * @param array{
+     *   collection_name: string,
+     *   color_ids: list<int>,
+     *   model_ids: list<int>,
+     *   total_products: int,
+     *   sync_index: int,
+     * } $state
+     */
+    private function saveFabricCollectionDeleteState(int $id, array $state): void
+    {
+        Yii::$app->session->set($this->fabricCollectionDeleteSessionKey($id), $state);
+    }
+
+    private function clearFabricCollectionDeleteState(int $id): void
+    {
+        Yii::$app->session->remove($this->fabricCollectionDeleteSessionKey($id));
     }
 
     public function actionSavePriceCategories(): Response

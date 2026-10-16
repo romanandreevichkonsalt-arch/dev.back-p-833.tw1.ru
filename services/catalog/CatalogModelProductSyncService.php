@@ -50,11 +50,34 @@ class CatalogModelProductSyncService
         }
 
         $deleted = 0;
-        foreach (
-            CatalogProduct::find()
-                ->where(['fabric_color_id' => $fabricColorIds])
-                ->all() as $product
-        ) {
+        while (true) {
+            $batchDeleted = $this->deleteProductBatchForFabricColorIds($fabricColorIds, 200);
+            if ($batchDeleted === 0) {
+                break;
+            }
+            $deleted += $batchDeleted;
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * @param int[] $fabricColorIds
+     */
+    public function deleteProductBatchForFabricColorIds(array $fabricColorIds, int $limit = 40): int
+    {
+        $fabricColorIds = array_values(array_filter(array_map('intval', $fabricColorIds), static fn (int $id): bool => $id > 0));
+        if ($fabricColorIds === [] || $limit <= 0) {
+            return 0;
+        }
+
+        $products = CatalogProduct::find()
+            ->where(['fabric_color_id' => $fabricColorIds])
+            ->limit($limit)
+            ->all();
+
+        $deleted = 0;
+        foreach ($products as $product) {
             $product->delete();
             $deleted++;
         }
