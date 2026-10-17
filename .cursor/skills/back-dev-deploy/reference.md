@@ -1,12 +1,12 @@
-# Deploy reference
+# Deploy reference — api.dev-fabrika.ru
 
 ## Пути на сервере (FastPanel)
 
 ```
-/var/www/dev_back_p_8_usr/data/
-├── repo/dev.back-p-833.tw1.ru/   ← rsync с локальной машины / CI
-├── app/dev.back-p-833.tw1.ru/    ← рабочая копия Yii2
-└── www/dev.back-p-833.tw1.ru → symlink на app/.../web
+/var/www/api_dev_fabr_usr/data/
+├── repo/api.dev-fabrika.ru/   ← rsync с локальной машины / CI
+├── app/api.dev-fabrika.ru/    ← рабочая копия Yii2
+└── www/api.dev-fabrika.ru → symlink на app/.../web
 ```
 
 ## Цепочка режима `files`
@@ -19,16 +19,8 @@
 
 ## Узкое место `full`
 
-`php yii open-api/generate` сканирует `docs/` + `controllers/`, swagger-php ~4 мин локально, 15–20 мин на dev VPS.
+`php yii open-api/generate` — долго на VPS; используй `full` только при изменении OpenAPI.
 
-Оптимизация (не реализована): пропуск при `OpenApiGeneratorService::isRuntimeFresh()`.
+## Legacy (не по умолчанию)
 
-## Настройка SSH-ключа
-
-На сервере один раз:
-
-```bash
-bash deploy/setup-github-actions-key.sh
-```
-
-Локально скопировать приватный ключ или использовать тот же для `SSH_IDENTITY_FILE`.
+`dev.back-p-833.tw1.ru` · `dev_back_p_8_usr@200.165.224.88` · `./deploy/deploy.sh` без prod-обёртки.

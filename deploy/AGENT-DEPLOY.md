@@ -1,5 +1,7 @@
 # Деплой back-dev — инструкция для агента
 
+> **fabrica-beget по умолчанию:** [AGENT-DEPLOY-PROD.md](./AGENT-DEPLOY-PROD.md) → **https://api.dev-fabrika.ru** (`./deploy/deploy-prod.sh`).
+
 Dev: **https://dev.back-p-833.tw1.ru**  
 SSH: `dev_back_p_8_usr@200.165.224.88` (тот же IP, что у `dev.back-p-833.tw1.ru`).
 

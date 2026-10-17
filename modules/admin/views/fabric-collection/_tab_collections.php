@@ -15,7 +15,17 @@ use yii\widgets\ActiveForm;
 /** @var FabricCollectionSearch $searchModel */
 ?>
 <div class="admin-toolbar">
-    <?= Html::a('Добавить коллекцию', ['create'], ['class' => 'admin-btn']) ?>
+    <div class="admin-toolbar__links">
+        <?= Html::a('Добавить коллекцию', ['create'], ['class' => 'admin-btn']) ?>
+        <?= Html::beginForm(['link-all-models'], 'post', ['class' => 'admin-toolbar__link-form']) ?>
+        <?= Html::submitButton('Обновить модели', [
+            'class' => 'admin-btn admin-btn--secondary',
+            'data' => [
+                'confirm' => 'Привязать все активные коллекции тканей ко всем моделям и пересобрать SKU? Операция может занять несколько минут.',
+            ],
+        ]) ?>
+        <?= Html::endForm() ?>
+    </div>
     <?php $filterForm = ActiveForm::begin([
         'method' => 'get',
         'action' => ['index'],

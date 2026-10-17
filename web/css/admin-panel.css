@@ -1452,7 +1452,14 @@ body.admin-modal-open {
 
 .admin-toolbar__links {
     display: flex;
-    gap: 16px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-toolbar__link-form {
+    margin: 0;
+    display: flex;
 }
 
 .admin-toolbar-search {

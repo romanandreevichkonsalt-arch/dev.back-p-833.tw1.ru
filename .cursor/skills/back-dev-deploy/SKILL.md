@@ -1,35 +1,33 @@
 ---
 name: back-dev-deploy
 description: >-
-  Deploy back-dev to dev.back-p-833.tw1.ru with modes files/app/full.
-  Use when the user asks to deploy, push to dev, rsync, or update the dev server.
-  Prefer mode files for PHP-only changes; full only when OpenAPI or docs/controllers changed.
+  Deploy this repo to https://api.dev-fabrika.ru via deploy-prod.sh (files/app/full).
+  Use when the user asks to deploy, push to dev, rsync, or update the server.
+  Prefer mode files for PHP-only changes; app when migrations; full when OpenAPI changed.
 ---
 
-# Деплой back-dev
+# Деплой api.dev-fabrika.ru (по умолчанию для fabrica-beget)
 
-**Полная инструкция (SSH, ASKPASS, retry):** [deploy/AGENT-DEPLOY.md](../../../deploy/AGENT-DEPLOY.md) — читать перед деплоем.
+**Полная инструкция:** [deploy/AGENT-DEPLOY-PROD.md](../../../deploy/AGENT-DEPLOY-PROD.md)
 
-Dev: **https://dev.back-p-833.tw1.ru** · SSH: `dev_back_p_8_usr@200.165.224.88`
+Цель: **https://api.dev-fabrika.ru** · SSH: `api_dev_fabr_usr@161.104.62.214`
 
-## SSH (локально)
+Старый хост `dev.back-p-833.tw1.ru` — только если пользователь явно попросит; иначе **не использовать**.
 
-1. Файл **`deploy/.ssh-askpass.sh`** (из `deploy/.ssh-askpass.sh.example`, `chmod 700`, **не в git**).
-2. Деплой **только так** (если нет `~/.ssh/github_actions_deploy`):
+## Команда
 
 ```bash
-cd /path/to/back-dev
-export SSH_ASKPASS="$PWD/deploy/.ssh-askpass.sh"
-export SSH_ASKPASS_REQUIRE=force
-export DISPLAY=:0
-./deploy/deploy.sh files   # | app | full
+cd /path/to/fabrica-beget
+./deploy/deploy-prod.sh files   # | app | full
 ```
 
-3. Shell: `required_permissions: ["all"]`.
-4. Нет `.ssh-askpass.sh` → попросить пользователя создать; **не** писать пароль в skill/коммит/команду из чата.
-5. Rsync timeout → **повторить** деплой один раз.
+`deploy-prod.sh` выставляет `SSH_HOST`, `SSH_USER`, `SITE_DOMAIN` и вызывает `deploy/deploy.sh`.
 
-`~/.ssh/id_ed25519` для `dev_back_p_8_usr` **не подходит**. Ключ CI: `~/.ssh/github_actions_deploy` — если есть, можно `./deploy/deploy.sh` без ASKPASS.
+SSH-ключ: по умолчанию `~/.ssh/id_ed25519` (см. prod-док). BatchMode `Permission denied` → ключ не добавлен у `api_dev_fabr_usr` в FastPanel.
+
+Shell: `required_permissions: ["all"]`.
+
+Rsync timeout → **повторить** деплой один раз.
 
 ## Режимы
 
@@ -42,10 +40,11 @@ export DISPLAY=:0
 ## После деплоя
 
 ```bash
-curl -sI "https://dev.back-p-833.tw1.ru/api/v1/catalog/menu" | head -5
+curl -sI "https://api.dev-fabrika.ru/api/v1/catalog/menu" | head -5
 ```
 
 ## Прочее
 
-- Архитектура repo/app: [reference.md](reference.md)
+- Пути на сервере: [reference.md](reference.md)
+- Legacy dev.back-p-833: [deploy/AGENT-DEPLOY.md](../../../deploy/AGENT-DEPLOY.md)
 - Commit/push — только по запросу пользователя

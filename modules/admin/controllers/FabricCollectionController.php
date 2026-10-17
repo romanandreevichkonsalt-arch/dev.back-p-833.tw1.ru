@@ -9,6 +9,7 @@ use app\models\CatalogModel;
 use app\models\MediaFile;
 use app\models\CatalogPriceCategory;
 use app\services\catalog\CatalogListingValueParser;
+use app\services\catalog\CatalogModelFabricLinkAllService;
 use app\services\catalog\CatalogModelProductSyncService;
 use app\services\catalog\FabricLibraryArchiveLauncher;
 use app\services\catalog\FabricLibraryArchiveUrls;
@@ -66,6 +67,26 @@ class FabricCollectionController extends BaseController
             'priceCategories' => $priceCategories,
             'activeTab' => $activeTab,
         ]);
+    }
+
+    public function actionLinkAllModels(): Response
+    {
+        if (!Yii::$app->request->isPost) {
+            throw new BadRequestHttpException('Только POST.');
+        }
+
+        $result = Yii::$container->get(CatalogModelFabricLinkAllService::class)->linkAllActiveFabricsToAllModels();
+
+        Yii::$app->session->setFlash(
+            'success',
+            sprintf(
+                'Модели обновлены: добавлено %d связей коллекция–модель, синхронизировано моделей — %d.',
+                (int)$result['links_added'],
+                (int)$result['models_synced']
+            )
+        );
+
+        return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS]);
     }
 
     public function actionDownloadTexturesArchive(): Response
