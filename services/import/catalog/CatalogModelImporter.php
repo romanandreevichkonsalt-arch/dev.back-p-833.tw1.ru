@@ -320,12 +320,6 @@ class CatalogModelImporter
             return;
         }
 
-        if ($options->backfillPhotoSourceUrlsOnly) {
-            $this->importRowBackfillPhotoUrlsOnly($row, $options, $result, $rowResult, $existing);
-
-            return;
-        }
-
         if ($options->skipIfNoFabric && $existing === null && !$this->rowHasFabricBindingSource($row)) {
             $rowResult->action = 'skipped';
             $rowResult->messages[] = $row->fabricCollectionNames === []
@@ -458,50 +452,6 @@ class CatalogModelImporter
                 );
                 $importRun->save(false, ['phase_message']);
             }
-        }
-    }
-
-    private function importRowBackfillPhotoUrlsOnly(
-        CatalogModelImportRowDto $row,
-        CatalogModelImportOptions $options,
-        CatalogModelImportResult $result,
-        CatalogModelImportRowResult $rowResult,
-        ?CatalogModel $existing,
-    ): void {
-        $rowResult->rowNumber = $row->rowNumber;
-        $rowResult->collectionName = $row->collectionName;
-        $rowResult->modelLabel = $row->displayLabel;
-
-        if ($options->dryRun) {
-            $rowResult->action = 'skipped';
-            $rowResult->messages[] = 'Dry-run: backfill source_url не выполняется.';
-
-            return;
-        }
-
-        if ($existing === null) {
-            $rowResult->action = 'skipped';
-            $rowResult->messages[] = 'Модель не найдена — ссылки не записаны.';
-            $result->stats['models_skipped']++;
-
-            return;
-        }
-
-        $messages = [];
-        $written = (new CatalogModelImportPhotoUrlBackfillService())->backfillForModel($existing, $row, $messages);
-        foreach ($messages as $message) {
-            $rowResult->messages[] = $message;
-        }
-
-        if ($written > 0) {
-            $rowResult->action = 'updated';
-            $rowResult->messages[] = sprintf('Всего записано ссылок на фото: %d.', $written);
-            $result->stats['photo_urls_backfilled'] = (int)($result->stats['photo_urls_backfilled'] ?? 0) + $written;
-            $result->stats['models_updated']++;
-        } else {
-            $rowResult->action = 'skipped';
-            $rowResult->messages[] = 'Нет слотов с фото для записи ссылки (или URL уже совпадают).';
-            $result->stats['models_skipped']++;
         }
     }
 

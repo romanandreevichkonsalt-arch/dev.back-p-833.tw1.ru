@@ -1331,7 +1331,6 @@ class CatalogModelController extends BaseController
         $options->conflictResolution = $parsed['conflictResolution'];
         $options->updateExisting = $parsed['conflictResolution'] === CatalogModelImportOptions::CONFLICT_UPDATE;
         $options->importMedia = $parsed['importMedia'];
-        $options->backfillPhotoSourceUrlsOnly = (bool)($parsed['backfillPhotoSourceUrls'] ?? false);
     }
 
     private function resolvePostedImportConflictAction(bool $updateExisting): string

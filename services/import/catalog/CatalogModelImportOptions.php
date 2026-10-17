@@ -21,9 +21,6 @@ class CatalogModelImportOptions
     public bool $skipIfNoFabric = false;
     public bool $importMedia = true;
 
-    /** TEMPORARY: только source_url на существующих фото модели, без загрузки и без правки полей модели. */
-    public bool $backfillPhotoSourceUrlsOnly = false;
-
     public function shouldWrite(): bool
     {
         return !$this->dryRun;

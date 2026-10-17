@@ -483,7 +483,6 @@ class CatalogModelImportRunService
             'filename' => $options->filename,
             'skip_if_no_fabric' => $options->skipIfNoFabric,
             'import_media' => $options->importMedia,
-            'backfill_photo_source_urls' => $options->backfillPhotoSourceUrlsOnly,
         ];
     }
 
@@ -502,7 +501,6 @@ class CatalogModelImportRunService
         $options->filename = (string)($data['filename'] ?? $run->filename);
         $options->skipIfNoFabric = (bool)($data['skip_if_no_fabric'] ?? false);
         $options->importMedia = (bool)($data['import_media'] ?? true);
-        $options->backfillPhotoSourceUrlsOnly = (bool)($data['backfill_photo_source_urls'] ?? false);
         $options->userId = $run->user_id !== null ? (int)$run->user_id : null;
 
         return $options;
