@@ -11,6 +11,11 @@ class CatalogModelImportResult
         'models_skipped' => 0,
         'models_conflict' => 0,
         'rows_skipped' => 0,
+        'photo_imported' => 0,
+        'photo_skipped' => 0,
+        'photo_queued' => 0,
+        'media_queue_failed' => 0,
+        'photo_urls_backfilled' => 0,
         'errors' => 0,
     ];
 

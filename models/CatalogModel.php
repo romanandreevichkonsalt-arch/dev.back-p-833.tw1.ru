@@ -724,12 +724,9 @@ class CatalogModel extends ActiveRecord
 
     public function syncFabricCollectionLinks(array $fabricCollectionIds): void
     {
-        $fabricCollectionIds = array_values(array_unique(array_filter(array_map('intval', $fabricCollectionIds))));
+        $fabricCollectionIds = $this->normalizeFabricCollectionIds($fabricCollectionIds);
 
-        $existing = \Yii::$app->db->createCommand(
-            'SELECT fabric_collection_id FROM {{%catalog_model_fabric_collections}} WHERE model_id = :id',
-            ['id' => $this->id]
-        )->queryColumn();
+        $existing = $this->existingFabricCollectionLinkIds();
 
         $toDelete = array_diff($existing, $fabricCollectionIds);
         foreach ($toDelete as $fabricCollectionId) {
@@ -739,6 +736,52 @@ class CatalogModel extends ActiveRecord
             )->execute();
         }
 
+        $this->insertFabricCollectionLinks($fabricCollectionIds, $existing);
+    }
+
+    /**
+     * Добавляет связи с коллекциями тканей, не удаляя существующие.
+     *
+     * @return int число новых связей
+     */
+    public function mergeFabricCollectionLinks(array $fabricCollectionIds): int
+    {
+        $fabricCollectionIds = $this->normalizeFabricCollectionIds($fabricCollectionIds);
+        $existing = $this->existingFabricCollectionLinkIds();
+
+        return $this->insertFabricCollectionLinks($fabricCollectionIds, $existing);
+    }
+
+    /**
+     * @param list<int|string> $fabricCollectionIds
+     * @return list<int>
+     */
+    private function normalizeFabricCollectionIds(array $fabricCollectionIds): array
+    {
+        return array_values(array_unique(array_filter(array_map('intval', $fabricCollectionIds))));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function existingFabricCollectionLinkIds(): array
+    {
+        return array_map(
+            'intval',
+            \Yii::$app->db->createCommand(
+                'SELECT fabric_collection_id FROM {{%catalog_model_fabric_collections}} WHERE model_id = :id',
+                ['id' => $this->id]
+            )->queryColumn()
+        );
+    }
+
+    /**
+     * @param list<int> $fabricCollectionIds
+     * @param list<int> $existing
+     */
+    private function insertFabricCollectionLinks(array $fabricCollectionIds, array $existing): int
+    {
+        $added = 0;
         $now = date('Y-m-d H:i:s');
         foreach ($fabricCollectionIds as $fabricCollectionId) {
             if (in_array($fabricCollectionId, $existing, true)) {
@@ -749,7 +792,10 @@ class CatalogModel extends ActiveRecord
                 'fabric_collection_id' => $fabricCollectionId,
                 'created_at' => $now,
             ])->execute();
+            $added++;
         }
+
+        return $added;
     }
 
     /**

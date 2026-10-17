@@ -2807,6 +2807,29 @@ body.admin-import-loading:not(.admin-import-loading--disabled) {
     overflow: hidden;
 }
 
+.admin-import-progress--indeterminate {
+    overflow: hidden;
+}
+
+.admin-import-progress--indeterminate .admin-import-progress__bar {
+    width: 35%;
+    animation: admin-import-progress-indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes admin-import-progress-indeterminate {
+    0% {
+        transform: translateX(-120%);
+    }
+    100% {
+        transform: translateX(320%);
+    }
+}
+
+.admin-btn--disabled {
+    pointer-events: none;
+    opacity: 0.55;
+}
+
 @keyframes admin-import-loader-spin {
     to {
         transform: rotate(360deg);

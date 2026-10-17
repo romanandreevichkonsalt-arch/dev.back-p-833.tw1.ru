@@ -33,5 +33,14 @@ class RegistryImportPostedOptionsTest extends Unit
         );
         verify($legacySkipNoMedia['importMedia'])->true();
         verify($legacySkipNoMedia['conflictResolution'])->equals(CatalogModelImportOptions::CONFLICT_SKIP);
+
+        $backfill = RegistryImportPostedOptions::parseConflictResolution(
+            RegistryImportPostedOptions::MODE_RECORD_PHOTO_URLS,
+            CatalogModelImportOptions::CONFLICT_SKIP,
+            CatalogModelImportOptions::CONFLICT_UPDATE
+        );
+        verify($backfill['importMedia'])->false();
+        verify($backfill['backfillPhotoSourceUrls'])->true();
+        verify($backfill['conflictResolution'])->equals(CatalogModelImportOptions::CONFLICT_UPDATE);
     }
 }

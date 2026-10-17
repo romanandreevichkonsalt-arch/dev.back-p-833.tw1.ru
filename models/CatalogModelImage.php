@@ -21,6 +21,7 @@ class CatalogModelImage extends ActiveRecord
             [['model_id', 'media_file_id', 'sort_order'], 'integer'],
             [['purpose'], 'string', 'max' => 16],
             [['purpose'], 'in', 'range' => [self::PURPOSE_ANGLE, self::PURPOSE_INTERIOR]],
+            [['source_url'], 'string', 'max' => 512],
             [['created_at'], 'safe'],
             [['media_file_id'], 'unique', 'targetAttribute' => ['model_id', 'media_file_id']],
         ];

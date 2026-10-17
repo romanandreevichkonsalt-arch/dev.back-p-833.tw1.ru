@@ -6,6 +6,7 @@ use app\models\CatalogFabricColor;
 use app\models\CatalogModel;
 use app\models\CatalogPriceCategory;
 use app\models\CatalogProduct;
+use app\services\search\SearchCatalogPriorityService;
 use Yii;
 
 class CatalogModelProductSyncService
@@ -85,7 +86,7 @@ class CatalogModelProductSyncService
         return $deleted;
     }
 
-    public function syncForModel(CatalogModel $model): void
+    public function syncForModel(CatalogModel $model, bool $onlyAddMissingFabricProducts = false): void
     {
         if ($model->isNewRecord) {
             return;
@@ -125,21 +126,46 @@ class CatalogModelProductSyncService
             ->indexBy('fabric_color_id')
             ->all();
 
+        /** @var array<int, int> $productIdByFabricColor */
+        $productIdByFabricColor = [];
+
         foreach ($expectedColorIds as $colorId => $color) {
             $product = $existingProducts[$colorId] ?? null;
             if ($product === null) {
                 $product = new CatalogProduct();
+                $this->applyProductFromModelAndColor($product, $model, $color);
+                $product->save(false);
+            } elseif (!$onlyAddMissingFabricProducts) {
+                $this->applyProductFromModelAndColor($product, $model, $color);
+                $product->save(false);
             }
-            $this->applyProductFromModelAndColor($product, $model, $color);
-            $product->save(false);
+            $productIdByFabricColor[(int)$colorId] = (int)$product->id;
             unset($existingProducts[$colorId]);
         }
 
-        foreach ($existingProducts as $product) {
-            $product->delete();
-        }
+        if (!$onlyAddMissingFabricProducts) {
+            $modelId = (int)$model->id;
+            $directionId = (int)($model->collection?->direction_id ?? 0);
+            $prioritySamples = new SearchCatalogPriorityService();
 
-        $this->deleteGhostFabricProductsForModel((int)$model->id);
+            foreach ($existingProducts as $product) {
+                $deletedProductId = (int)$product->id;
+                $replacementId = $prioritySamples->findReplacementSampleProductId(
+                    $modelId,
+                    $directionId,
+                    $productIdByFabricColor,
+                    (int)$product->fabric_color_id,
+                );
+                if ($replacementId > 0 && $replacementId !== $deletedProductId) {
+                    $prioritySamples->remapSampleProductId($modelId, $deletedProductId, $replacementId);
+                }
+
+                $product->delete();
+            }
+
+            $this->deleteGhostFabricProductsForModel($modelId);
+            $prioritySamples->reconcileSampleProductsForModel($modelId);
+        }
     }
 
     /**

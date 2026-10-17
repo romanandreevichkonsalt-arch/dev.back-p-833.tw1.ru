@@ -14,12 +14,18 @@ use yii\widgets\ActiveForm;
 /** @var CatalogFabricCollection[] $collections */
 /** @var FabricCollectionSearch $searchModel */
 ?>
+<div data-fabric-link-all-root
+     data-fabric-link-all-url="<?= \yii\helpers\Html::encode(\yii\helpers\Url::to(['link-all-models'])) ?>">
 <div class="admin-toolbar">
     <div class="admin-toolbar__links">
         <?= Html::a('Добавить коллекцию', ['create'], ['class' => 'admin-btn']) ?>
-        <?= Html::beginForm(['link-all-models'], 'post', ['class' => 'admin-toolbar__link-form']) ?>
+        <?= Html::beginForm(['link-all-models'], 'post', [
+            'class' => 'admin-toolbar__link-form',
+            'data-fabric-link-all-form' => '1',
+        ]) ?>
         <?= Html::submitButton('Обновить модели', [
             'class' => 'admin-btn admin-btn--secondary',
+            'data-fabric-link-all-submit' => '1',
             'data' => [
                 'confirm' => 'Привязать все активные коллекции тканей ко всем моделям и пересобрать SKU? Операция может занять несколько минут.',
             ],
@@ -51,6 +57,19 @@ use yii\widgets\ActiveForm;
         ]) ?>
     </div>
     <?php ActiveForm::end(); ?>
+</div>
+
+<div class="admin-import-loader admin-import-loader--corner" data-fabric-link-all-loader hidden role="status" aria-live="polite" aria-label="Обновление моделей">
+    <div class="admin-import-loader__panel">
+        <span class="admin-import-loader__spinner" aria-hidden="true"></span>
+        <p class="admin-import-loader__text" data-fabric-link-all-text>Обновление моделей…</p>
+        <div class="admin-import-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div class="admin-import-progress__bar" data-fabric-link-all-bar style="width: 0%"></div>
+        </div>
+        <p class="admin-import-loader__hint admin-muted" data-fabric-link-all-stats></p>
+        <p class="admin-import-loader__hint admin-muted">Не закрывайте вкладку — идёт пошаговая синхронизация SKU.</p>
+    </div>
+</div>
 </div>
 
 <div class="admin-card admin-card--full admin-fabric-import" id="fabric-import"
@@ -239,6 +258,11 @@ $this->registerJsFile('@web/js/admin-fabric-import.js', [
     'appendTimestamp' => true,
 ]);
 $this->registerJsFile('@web/js/admin-fabric-collection-delete.js', [
+    'depends' => [\app\modules\admin\assets\AdminAsset::class],
+    'position' => View::POS_END,
+    'appendTimestamp' => true,
+]);
+$this->registerJsFile('@web/js/admin-fabric-link-all-models.js', [
     'depends' => [\app\modules\admin\assets\AdminAsset::class],
     'position' => View::POS_END,
     'appendTimestamp' => true,

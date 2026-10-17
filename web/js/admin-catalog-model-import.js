@@ -52,10 +52,11 @@
         });
     }
 
-    function formatStats(stats) {
+    function formatStats(stats, context) {
         if (!stats) {
             return '';
         }
+        var phase = context && context.phase;
         var parts = [];
         if (stats.models_created) {
             parts.push('создано: ' + stats.models_created);
@@ -65,6 +66,19 @@
         }
         if (stats.models_skipped) {
             parts.push('пропущено: ' + stats.models_skipped);
+        }
+        if (phase === 'media' && context.mediaTotal > 0) {
+            parts.push('фото: ' + context.mediaProcessed + ' из ' + context.mediaTotal);
+        } else if (stats.photo_imported) {
+            parts.push('фото: ' + stats.photo_imported);
+        } else if (stats.photo_queued && phase !== 'media' && phase !== 'done') {
+            parts.push('в очередь: ' + stats.photo_queued);
+        }
+        if (stats.media_queue_failed) {
+            parts.push('ошибок фото: ' + stats.media_queue_failed);
+        }
+        if (stats.photo_urls_backfilled) {
+            parts.push('ссылок записано: ' + stats.photo_urls_backfilled);
         }
         if (stats.errors) {
             parts.push('ошибок: ' + stats.errors);
@@ -141,17 +155,30 @@
         function updateProgressView(data) {
             var processed = data.processed || 0;
             var total = data.total || 0;
-            var percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+            var mediaProcessed = data.mediaProcessed || 0;
+            var mediaTotal = data.mediaTotal || 0;
+            var percent;
+
+            if (data.phase === 'media' && mediaTotal > 0) {
+                percent = Math.min(100, Math.round((mediaProcessed / mediaTotal) * 100));
+            } else {
+                percent = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+            }
 
             if (progressText) {
-                progressText.textContent = data.message || ('Обработано ' + processed + ' из ' + total);
+                if (data.phase === 'media' && mediaTotal > 0) {
+                    progressText.textContent = data.message
+                        || ('Загрузка фото: ' + mediaProcessed + ' из ' + mediaTotal);
+                } else {
+                    progressText.textContent = data.message || ('Обработано ' + processed + ' из ' + total);
+                }
             }
             if (progressBar) {
                 progressBar.style.width = percent + '%';
                 progressBar.setAttribute('aria-valuenow', String(percent));
             }
             if (progressStats) {
-                progressStats.textContent = formatStats(data.stats);
+                progressStats.textContent = formatStats(data.stats, data);
             }
         }
 
@@ -174,10 +201,13 @@
                 return false;
             }
 
+            if (data.phase === 'media') {
+                return false;
+            }
+
             return data.status === 'completed'
                 || data.phase === 'done'
-                || data.success === true
-                || (data.total > 0 && data.processed >= data.total);
+                || data.success === true;
         }
 
         function showSuccessState(data) {
@@ -198,7 +228,7 @@
                 progressText.textContent = data.message || 'Импорт завершён';
             }
             if (progressStats) {
-                progressStats.textContent = formatStats(data.stats);
+                progressStats.textContent = formatStats(data.stats, data);
             }
         }
 

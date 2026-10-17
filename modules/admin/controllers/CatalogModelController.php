@@ -1140,6 +1140,34 @@ class CatalogModelController extends BaseController
         return $service->getStatusPayload($id);
     }
 
+    public function actionImportAbort(): array
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+
+        $runId = (int)Yii::$app->request->post('run_id', 0);
+        if ($runId <= 0) {
+            Yii::$app->response->statusCode = 400;
+
+            return ['message' => 'Не указан run_id.'];
+        }
+
+        try {
+            $service = new CatalogModelImportRunService();
+            $run = $service->abortRun($runId);
+
+            return [
+                'runId' => (int)$run->id,
+                'status' => $run->status,
+                'message' => (string)$run->phase_message,
+                'finished' => $run->isTerminal(),
+            ];
+        } catch (\Throwable $e) {
+            Yii::$app->response->statusCode = 400;
+
+            return ['message' => $e->getMessage()];
+        }
+    }
+
     /** @deprecated Используйте import-start + polling */
     public function actionImportRun(): Response|string
     {
@@ -1303,6 +1331,7 @@ class CatalogModelController extends BaseController
         $options->conflictResolution = $parsed['conflictResolution'];
         $options->updateExisting = $parsed['conflictResolution'] === CatalogModelImportOptions::CONFLICT_UPDATE;
         $options->importMedia = $parsed['importMedia'];
+        $options->backfillPhotoSourceUrlsOnly = (bool)($parsed['backfillPhotoSourceUrls'] ?? false);
     }
 
     private function resolvePostedImportConflictAction(bool $updateExisting): string

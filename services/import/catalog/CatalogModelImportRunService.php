@@ -3,7 +3,6 @@
 namespace app\services\import\catalog;
 
 use app\models\CatalogImportRun;
-use app\services\cache\ApiCacheInvalidator;
 use app\services\import\ImportRunWorkerLauncher;
 use app\services\import\SpreadsheetFormatValidator;
 use Yii;
@@ -16,6 +15,8 @@ class CatalogModelImportRunService
 {
     public function __construct(
         private readonly CatalogModelImporter $importer = new CatalogModelImporter(),
+        private readonly CatalogModelImportRunCompletion $completion = new CatalogModelImportRunCompletion(),
+        private readonly CatalogModelImportMediaQueueProcessor $mediaProcessor = new CatalogModelImportMediaQueueProcessor(),
     ) {
     }
 
@@ -39,6 +40,27 @@ class CatalogModelImportRunService
         } catch (\InvalidArgumentException $e) {
             @unlink($storedPath);
             throw new BadRequestHttpException('Ошибка импорта: ' . $e->getMessage(), 0, $e);
+        }
+
+        $this->abortRunsWithoutActiveWorker();
+
+        $activeRunId = CatalogImportRun::find()
+            ->select('id')
+            ->where(['type' => CatalogImportRun::TYPE_MODEL])
+            ->andWhere(['status' => [
+                CatalogImportRun::STATUS_QUEUED,
+                CatalogImportRun::STATUS_PARSING,
+                CatalogImportRun::STATUS_PROCESSING,
+                CatalogImportRun::STATUS_AWAITING_CONFLICT,
+            ]])
+            ->orderBy(['id' => SORT_DESC])
+            ->scalar();
+        if ($activeRunId !== false && (int)$activeRunId > 0) {
+            @unlink($storedPath);
+            throw new BadRequestHttpException(sprintf(
+                'Уже выполняется импорт моделей (запуск #%d). Дождитесь завершения или отмените зависший запуск.',
+                (int)$activeRunId
+            ));
         }
 
         $run = new CatalogImportRun([
@@ -117,13 +139,14 @@ class CatalogModelImportRunService
                 return;
             }
 
-            $this->ensureRunCompleted($run);
+            if ($run->phase === CatalogImportRun::PHASE_MEDIA && $this->completion->pendingModelMediaCount($runId) > 0) {
+                $this->dispatchMediaWorker($runId);
 
-            if ($run->status === CatalogImportRun::STATUS_COMPLETED) {
-                @unlink($run->file_path);
-                $run->file_path = null;
-                $run->save(false, ['file_path']);
-                ApiCacheInvalidator::touch();
+                return;
+            }
+
+            if ($this->completion->canMarkCompleted($run)) {
+                $this->completion->finalizeCompleted($run);
             }
         } catch (\Throwable $exception) {
             Yii::error($exception->getMessage(), __METHOD__);
@@ -135,9 +158,56 @@ class CatalogModelImportRunService
                 $run->save(false);
             }
         } finally {
-            $run = $this->findRun($runId);
-            $this->ensureRunCompleted($run);
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+            @unlink($lockPath);
+        }
+    }
 
+    public function processMediaQueue(int $runId, int $limit = 40, int $concurrency = 8): void
+    {
+        $run = $this->findRun($runId);
+        if ($run->isTerminal()) {
+            return;
+        }
+
+        $lockPath = $this->lockPath($runId) . '.media';
+        $lockHandle = fopen($lockPath, 'c+');
+        if ($lockHandle === false || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            if ($lockHandle !== false) {
+                fclose($lockHandle);
+            }
+
+            return;
+        }
+
+        try {
+            $run->status = CatalogImportRun::STATUS_PROCESSING;
+            $run->phase = CatalogImportRun::PHASE_MEDIA;
+            $run->save(false, ['status', 'phase']);
+
+            $batch = $this->mediaProcessor->processRun($runId, $limit, $concurrency);
+            $run = $this->findRun($runId);
+
+            if ($batch['continue']) {
+                $this->dispatchMediaWorker($runId);
+
+                return;
+            }
+
+            if ($this->completion->canMarkCompleted($run)) {
+                $this->completion->finalizeCompleted($run);
+            }
+        } catch (\Throwable $exception) {
+            Yii::error($exception->getMessage(), __METHOD__);
+            $run = $this->findRun($runId);
+            if (!$run->isTerminal()) {
+                $run->status = CatalogImportRun::STATUS_FAILED;
+                $run->error_message = $exception->getMessage();
+                $run->finished_at = date('Y-m-d H:i:s');
+                $run->save(false);
+            }
+        } finally {
             flock($lockHandle, LOCK_UN);
             fclose($lockHandle);
             @unlink($lockPath);
@@ -191,10 +261,29 @@ class CatalogModelImportRunService
     /**
      * @return array<string, mixed>
      */
-    public function getStatusPayload(int $runId): array
+    public function abortRun(int $runId): CatalogImportRun
     {
         $run = $this->findRun($runId);
-        $this->ensureRunCompleted($run);
+        if ($run->isTerminal()) {
+            return $run;
+        }
+
+        if ($this->isRunWorkerLocked($runId)) {
+            throw new BadRequestHttpException('Импорт ещё выполняется в фоне — дождитесь завершения.');
+        }
+
+        $this->markRunAborted($run, 'Импорт отменён вручную.');
+
+        return $run;
+    }
+
+    public function getStatusPayload(int $runId): array
+    {
+        $this->abortRunsWithoutActiveWorker();
+
+        $run = $this->findRun($runId);
+        $this->completion->finalizeCompleted($run);
+        $this->maybeRedispatchStalledWorker($run);
 
         if ($run->status === CatalogImportRun::STATUS_QUEUED) {
             $createdAt = strtotime((string)$run->created_at);
@@ -205,13 +294,22 @@ class CatalogModelImportRunService
 
         $payload = $run->getStats();
         $stats = is_array($payload['stats'] ?? null) ? $payload['stats'] : [];
+        $processed = (int)$run->processed_rows;
+        $total = (int)$run->total_rows;
+        $mediaProcessed = $run->getMediaProcessedRows();
+        $mediaTotal = $run->getMediaTotal();
+        if ($run->phase === CatalogImportRun::PHASE_MEDIA && $mediaTotal <= 0) {
+            $mediaTotal = max($mediaTotal, $this->completion->pendingModelMediaCount($runId));
+        }
 
         return [
             'id' => (int)$run->id,
             'status' => $run->status,
             'phase' => $run->phase,
-            'processed' => (int)$run->processed_rows,
-            'total' => (int)$run->total_rows,
+            'processed' => $processed,
+            'total' => $total,
+            'mediaProcessed' => $mediaProcessed,
+            'mediaTotal' => $mediaTotal,
             'message' => (string)$run->phase_message,
             'stats' => $stats,
             'pendingConflict' => $payload['pending_conflict'] ?? null,
@@ -228,32 +326,63 @@ class CatalogModelImportRunService
         ImportRunWorkerLauncher::dispatch('catalog-model-import/run', $runId, 'catalog-model-import');
     }
 
-    private function ensureRunCompleted(CatalogImportRun $run): void
+    public function dispatchMediaWorker(int $runId): void
     {
-        if ($run->total_rows <= 0 || $run->processed_rows < $run->total_rows) {
+        ImportRunWorkerLauncher::dispatch('catalog-model-import/process-media-queue', $runId, 'catalog-model-import');
+    }
+
+    private function maybeRedispatchStalledWorker(CatalogImportRun $run): void
+    {
+        if ($run->status !== CatalogImportRun::STATUS_PROCESSING) {
             return;
         }
 
-        if (in_array($run->status, [
-            CatalogImportRun::STATUS_COMPLETED,
-            CatalogImportRun::STATUS_FAILED,
-            CatalogImportRun::STATUS_ABORTED,
-            CatalogImportRun::STATUS_AWAITING_CONFLICT,
-        ], true)) {
+        if ($run->phase === CatalogImportRun::PHASE_MEDIA) {
+            $this->maybeRedispatchStalledMediaWorker($run);
+
             return;
         }
 
-        $run->status = CatalogImportRun::STATUS_COMPLETED;
-        $run->phase = CatalogImportRun::PHASE_DONE;
-        $run->phase_message = sprintf(
-            'Обработано %d строк из %d',
-            (int)$run->total_rows,
-            (int)$run->total_rows
-        );
-        if ($run->finished_at === null) {
-            $run->finished_at = date('Y-m-d H:i:s');
+        $lockPath = $this->lockPath((int)$run->id);
+        $lockHandle = @fopen($lockPath, 'c+');
+        if ($lockHandle === false) {
+            return;
         }
-        $run->save(false);
+
+        if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            fclose($lockHandle);
+
+            return;
+        }
+
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+        @unlink($lockPath);
+        $this->dispatchWorker((int)$run->id);
+    }
+
+    private function maybeRedispatchStalledMediaWorker(CatalogImportRun $run): void
+    {
+        if ($this->completion->pendingModelMediaCount((int)$run->id) <= 0) {
+            return;
+        }
+
+        $lockPath = $this->lockPath((int)$run->id) . '.media';
+        $lockHandle = @fopen($lockPath, 'c+');
+        if ($lockHandle === false) {
+            return;
+        }
+
+        if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            fclose($lockHandle);
+
+            return;
+        }
+
+        flock($lockHandle, LOCK_UN);
+        fclose($lockHandle);
+        @unlink($lockPath);
+        $this->dispatchMediaWorker((int)$run->id);
     }
 
     private function findRun(int $runId): CatalogImportRun
@@ -277,6 +406,71 @@ class CatalogModelImportRunService
         return $dir . '/run-' . $runId . '.lock';
     }
 
+    private function mediaLockPath(int $runId): string
+    {
+        return $this->lockPath($runId) . '.media';
+    }
+
+    private function isRunWorkerLocked(int $runId): bool
+    {
+        return $this->isLockHeldByWorker($this->lockPath($runId))
+            || $this->isLockHeldByWorker($this->mediaLockPath($runId));
+    }
+
+    private function isLockHeldByWorker(string $lockPath): bool
+    {
+        $lockHandle = @fopen($lockPath, 'c+');
+        if ($lockHandle === false) {
+            return false;
+        }
+
+        if (flock($lockHandle, LOCK_EX | LOCK_NB)) {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+
+            return false;
+        }
+
+        fclose($lockHandle);
+
+        return true;
+    }
+
+    private function abortRunsWithoutActiveWorker(): void
+    {
+        $runs = CatalogImportRun::find()
+            ->where(['type' => CatalogImportRun::TYPE_MODEL])
+            ->andWhere(['status' => [
+                CatalogImportRun::STATUS_QUEUED,
+                CatalogImportRun::STATUS_PARSING,
+                CatalogImportRun::STATUS_PROCESSING,
+            ]])
+            ->all();
+
+        foreach ($runs as $run) {
+            if ($this->isRunWorkerLocked((int)$run->id)) {
+                continue;
+            }
+
+            $this->markRunAborted(
+                $run,
+                'Импорт остановлен: фоновый процесс не активен (перезапуск сервера или сбой воркера).'
+            );
+        }
+    }
+
+    private function markRunAborted(CatalogImportRun $run, string $message): void
+    {
+        $run->status = CatalogImportRun::STATUS_ABORTED;
+        $run->phase = CatalogImportRun::PHASE_DONE;
+        $run->phase_message = $message;
+        $run->assignErrorMessage($message);
+        if ($run->finished_at === null) {
+            $run->finished_at = date('Y-m-d H:i:s');
+        }
+        $run->save(false);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -289,6 +483,7 @@ class CatalogModelImportRunService
             'filename' => $options->filename,
             'skip_if_no_fabric' => $options->skipIfNoFabric,
             'import_media' => $options->importMedia,
+            'backfill_photo_source_urls' => $options->backfillPhotoSourceUrlsOnly,
         ];
     }
 
@@ -307,6 +502,7 @@ class CatalogModelImportRunService
         $options->filename = (string)($data['filename'] ?? $run->filename);
         $options->skipIfNoFabric = (bool)($data['skip_if_no_fabric'] ?? false);
         $options->importMedia = (bool)($data['import_media'] ?? true);
+        $options->backfillPhotoSourceUrlsOnly = (bool)($data['backfill_photo_source_urls'] ?? false);
         $options->userId = $run->user_id !== null ? (int)$run->user_id : null;
 
         return $options;
@@ -322,7 +518,8 @@ class CatalogModelImportRunService
         $result = new CatalogModelImportResult();
         $result->success = (bool)($payload['success'] ?? true);
         $result->aborted = (bool)($payload['aborted'] ?? false);
-        $result->stats = is_array($payload['stats'] ?? null) ? $payload['stats'] : $result->stats;
+        $savedStats = is_array($payload['stats'] ?? null) ? $payload['stats'] : [];
+        $result->stats = array_merge($result->stats, $savedStats);
         $result->pendingConflict = is_array($payload['pending_conflict'] ?? null)
             ? $payload['pending_conflict']
             : null;

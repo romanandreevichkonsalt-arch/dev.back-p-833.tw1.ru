@@ -8,15 +8,26 @@ final class RegistryImportPostedOptions
     public const MODE_UPDATE = 'update';
     public const MODE_UPDATE_NO_MEDIA = 'update_no_media';
 
+    /** TEMPORARY: разовый backfill source_url у моделей — удалить после прогона. */
+    public const MODE_RECORD_PHOTO_URLS = 'record_photo_urls_temp';
+
     private const NO_MEDIA_SUFFIX = '_no_media';
 
     /**
-     * @return array{conflictResolution: string, importMedia: bool}
+     * @return array{conflictResolution: string, importMedia: bool, backfillPhotoSourceUrls: bool}
      */
     public static function parseConflictResolution(string $posted, string $skipConst, string $updateConst): array
     {
         $value = trim($posted);
         $importMedia = true;
+        $backfillPhotoSourceUrls = false;
+        if ($value === self::MODE_RECORD_PHOTO_URLS) {
+            return [
+                'conflictResolution' => $updateConst,
+                'importMedia' => false,
+                'backfillPhotoSourceUrls' => true,
+            ];
+        }
         if ($value === self::MODE_UPDATE_NO_MEDIA) {
             $importMedia = false;
             $value = self::MODE_UPDATE;
@@ -30,6 +41,7 @@ final class RegistryImportPostedOptions
         return [
             'conflictResolution' => $conflictResolution,
             'importMedia' => $importMedia,
+            'backfillPhotoSourceUrls' => $backfillPhotoSourceUrls,
         ];
     }
 }

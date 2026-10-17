@@ -69,24 +69,174 @@ class FabricCollectionController extends BaseController
         ]);
     }
 
-    public function actionLinkAllModels(): Response
+    public function actionLinkAllModels(): Response|array
     {
         if (!Yii::$app->request->isPost) {
             throw new BadRequestHttpException('Только POST.');
+        }
+
+        if ($this->isLinkAllModelsAjax()) {
+            Yii::$app->response->format = Response::FORMAT_JSON;
+
+            return match ((string)Yii::$app->request->post('stage', '')) {
+                'init' => $this->linkAllModelsInit(),
+                'sync' => $this->linkAllModelsSync(),
+                default => throw new BadRequestHttpException('Неизвестный этап обновления моделей.'),
+            };
         }
 
         $result = Yii::$container->get(CatalogModelFabricLinkAllService::class)->linkAllActiveFabricsToAllModels();
 
         Yii::$app->session->setFlash(
             'success',
-            sprintf(
-                'Модели обновлены: добавлено %d связей коллекция–модель, синхронизировано моделей — %d.',
-                (int)$result['links_added'],
-                (int)$result['models_synced']
-            )
+            $this->linkAllModelsFlashMessage((int)$result['links_added'], (int)$result['models_synced'])
         );
 
         return $this->redirect(['index', 'tab' => self::TAB_COLLECTIONS]);
+    }
+
+    private function isLinkAllModelsAjax(): bool
+    {
+        return Yii::$app->request->isAjax
+            || str_contains((string)Yii::$app->request->headers->get('Accept', ''), 'application/json');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function linkAllModelsInit(): array
+    {
+        $service = Yii::$container->get(CatalogModelFabricLinkAllService::class);
+        $linksAdded = $service->insertMissingFabricLinks();
+        $modelIds = $service->getAllModelIds();
+
+        $this->saveLinkAllModelsState([
+            'model_ids' => $modelIds,
+            'sync_index' => 0,
+            'links_added' => $linksAdded,
+        ]);
+
+        $totalModels = count($modelIds);
+        if ($totalModels === 0) {
+            ApiCacheInvalidator::touch();
+            $this->clearLinkAllModelsState();
+            Yii::$app->session->setFlash('success', $this->linkAllModelsFlashMessage($linksAdded, 0));
+
+            return [
+                'done' => true,
+                'needsSync' => false,
+                'linksAdded' => $linksAdded,
+                'totalModels' => 0,
+                'syncedModels' => 0,
+                'message' => 'Готово',
+                'redirect' => Url::to(['index', 'tab' => self::TAB_COLLECTIONS]),
+            ];
+        }
+
+        return [
+            'done' => false,
+            'needsSync' => true,
+            'linksAdded' => $linksAdded,
+            'totalModels' => $totalModels,
+            'syncedModels' => 0,
+            'message' => 'Связи коллекций добавлены, синхронизация SKU…',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function linkAllModelsSync(): array
+    {
+        $state = $this->loadLinkAllModelsState();
+        if ($state === null) {
+            throw new BadRequestHttpException('Сессия обновления истекла. Обновите страницу и попробуйте снова.');
+        }
+
+        /** @var list<int> $modelIds */
+        $modelIds = $state['model_ids'];
+        $syncIndex = (int)$state['sync_index'];
+        $linksAdded = (int)$state['links_added'];
+        $service = Yii::$container->get(CatalogModelFabricLinkAllService::class);
+
+        if ($syncIndex < count($modelIds)) {
+            $service->syncModelById((int)$modelIds[$syncIndex]);
+            $syncIndex++;
+            $state['sync_index'] = $syncIndex;
+            $this->saveLinkAllModelsState($state);
+        }
+
+        $totalModels = count($modelIds);
+        $done = $syncIndex >= $totalModels;
+
+        if ($done) {
+            ApiCacheInvalidator::touch();
+            $this->clearLinkAllModelsState();
+            Yii::$app->session->setFlash('success', $this->linkAllModelsFlashMessage($linksAdded, $syncIndex));
+
+            return [
+                'done' => true,
+                'needsSync' => false,
+                'linksAdded' => $linksAdded,
+                'totalModels' => $totalModels,
+                'syncedModels' => $syncIndex,
+                'message' => 'Модели обновлены',
+                'redirect' => Url::to(['index', 'tab' => self::TAB_COLLECTIONS]),
+            ];
+        }
+
+        return [
+            'done' => false,
+            'needsSync' => true,
+            'linksAdded' => $linksAdded,
+            'totalModels' => $totalModels,
+            'syncedModels' => $syncIndex,
+            'message' => sprintf('Синхронизация моделей: %d из %d', $syncIndex, $totalModels),
+        ];
+    }
+
+    private function linkAllModelsFlashMessage(int $linksAdded, int $modelsSynced): string
+    {
+        return sprintf(
+            'Модели обновлены: добавлено %d связей коллекция–модель, синхронизировано моделей — %d.',
+            $linksAdded,
+            $modelsSynced
+        );
+    }
+
+    private function linkAllModelsSessionKey(): string
+    {
+        return 'fabric_link_all_models';
+    }
+
+    /**
+     * @param array{model_ids: list<int>, sync_index: int, links_added: int} $state
+     */
+    private function saveLinkAllModelsState(array $state): void
+    {
+        Yii::$app->session->set($this->linkAllModelsSessionKey(), $state);
+    }
+
+    /**
+     * @return array{model_ids: list<int>, sync_index: int, links_added: int}|null
+     */
+    private function loadLinkAllModelsState(): ?array
+    {
+        $state = Yii::$app->session->get($this->linkAllModelsSessionKey());
+        if (!is_array($state) || !isset($state['model_ids']) || !is_array($state['model_ids'])) {
+            return null;
+        }
+
+        return [
+            'model_ids' => array_map('intval', $state['model_ids']),
+            'sync_index' => (int)($state['sync_index'] ?? 0),
+            'links_added' => (int)($state['links_added'] ?? 0),
+        ];
+    }
+
+    private function clearLinkAllModelsState(): void
+    {
+        Yii::$app->session->remove($this->linkAllModelsSessionKey());
     }
 
     public function actionDownloadTexturesArchive(): Response

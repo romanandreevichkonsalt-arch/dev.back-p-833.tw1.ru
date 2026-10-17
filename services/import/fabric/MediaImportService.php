@@ -131,6 +131,28 @@ class MediaImportService
         );
     }
 
+    public function importCatalogMediaFromDownloadedFile(
+        string $tempPath,
+        string $sourceUrl,
+        string $preferredBasename,
+        string $kind,
+        string $folderSlug,
+        ?string $downloadedFilename = null,
+        bool $generateImageVariants = true,
+    ): MediaFile {
+        $preferredBasename = $this->ensurePreferredBasenameExtension($preferredBasename, $sourceUrl);
+
+        return $this->importFromTempPath(
+            $tempPath,
+            $sourceUrl,
+            $preferredBasename,
+            $kind,
+            $folderSlug,
+            $downloadedFilename,
+            $generateImageVariants,
+        );
+    }
+
     public function importCatalogMedia(
         string $url,
         string $preferredBasename,

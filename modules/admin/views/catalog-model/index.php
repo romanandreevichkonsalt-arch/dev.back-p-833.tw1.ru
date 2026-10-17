@@ -53,6 +53,7 @@ $this->title = 'Модели каталога';
                 <option value="<?= Html::encode(\app\modules\admin\helpers\RegistryImportPostedOptions::MODE_SKIP) ?>" selected>Только добавление</option>
                 <option value="<?= Html::encode(\app\modules\admin\helpers\RegistryImportPostedOptions::MODE_UPDATE) ?>">Обновлять существующие</option>
                 <option value="<?= Html::encode(\app\modules\admin\helpers\RegistryImportPostedOptions::MODE_UPDATE_NO_MEDIA) ?>">Обновления без фото</option>
+                <option value="<?= Html::encode(\app\modules\admin\helpers\RegistryImportPostedOptions::MODE_RECORD_PHOTO_URLS) ?>">Разово: записать ссылки на фото (без загрузки)</option>
             </select>
         </div>
         <div class="admin-fabric-import__checks">

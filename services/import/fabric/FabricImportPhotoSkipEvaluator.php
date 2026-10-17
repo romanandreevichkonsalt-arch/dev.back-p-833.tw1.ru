@@ -25,6 +25,11 @@ final class FabricImportPhotoSkipEvaluator
             return null;
         }
 
+        $storedUrl = trim((string)($link->source_photo_url ?? ''));
+        if ($storedUrl === '') {
+            return 'Фото уже в каталоге (нет сохранённой ссылки источника) — загрузка не выполнялась.';
+        }
+
         $incoming = trim((string)($row->textureUrl ?? ''));
         if ($incoming === '') {
             return null;

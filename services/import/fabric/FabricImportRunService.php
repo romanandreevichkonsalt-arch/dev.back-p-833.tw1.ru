@@ -357,30 +357,7 @@ class FabricImportRunService
 
     private function ensureRunCompleted(CatalogImportRun $run): void
     {
-        if (!$this->completion->canMarkCompleted($run)) {
-            return;
-        }
-
-        if (in_array($run->status, [
-            CatalogImportRun::STATUS_COMPLETED,
-            CatalogImportRun::STATUS_FAILED,
-            CatalogImportRun::STATUS_ABORTED,
-            CatalogImportRun::STATUS_AWAITING_CONFLICT,
-        ], true)) {
-            return;
-        }
-
-        $run->status = CatalogImportRun::STATUS_COMPLETED;
-        $run->phase = CatalogImportRun::PHASE_DONE;
-        $run->phase_message = sprintf(
-            'Обработано %d строк из %d',
-            (int)$run->total_rows,
-            (int)$run->total_rows
-        );
-        if ($run->finished_at === null) {
-            $run->finished_at = date('Y-m-d H:i:s');
-        }
-        $run->save(false, ['status', 'phase', 'phase_message', 'finished_at']);
+        $this->completion->finalizeCompleted($run);
     }
 
     /**
@@ -559,7 +536,8 @@ class FabricImportRunService
         $result = new FabricRegistryImportResult();
         $result->success = (bool)($payload['success'] ?? true);
         $result->aborted = (bool)($payload['aborted'] ?? false);
-        $result->stats = is_array($payload['stats'] ?? null) ? $payload['stats'] : $result->stats;
+        $savedStats = is_array($payload['stats'] ?? null) ? $payload['stats'] : [];
+        $result->stats = array_merge($result->stats, $savedStats);
         $result->pendingConflict = is_array($payload['pending_conflict'] ?? null)
             ? $payload['pending_conflict']
             : null;

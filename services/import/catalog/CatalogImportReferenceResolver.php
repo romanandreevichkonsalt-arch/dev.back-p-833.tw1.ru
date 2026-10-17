@@ -15,10 +15,30 @@ class CatalogImportReferenceResolver
     /** @var array<string, int> */
     private array $priceCategoryCache = [];
 
+    /** @var array<string, CatalogDirection> */
+    private array $directionCache = [];
+
+    /** @var array<string, CatalogCollection> */
+    private array $collectionCache = [];
+
+    /** @var array<string, CatalogCategory> */
+    private array $categoryCache = [];
+
+    /** @var array<string, CatalogSubcategory> */
+    private array $subcategoryCache = [];
+
+    /** @var array<string, CatalogFabricCollection|null> */
+    private array $fabricCollectionCache = [];
+
     public function resolveDirection(string $label): CatalogDirection
     {
         $label = trim($label);
-        $normalized = mb_strtolower($label, 'UTF-8');
+        $cacheKey = mb_strtolower($label, 'UTF-8');
+        if (isset($this->directionCache[$cacheKey])) {
+            return $this->directionCache[$cacheKey];
+        }
+
+        $normalized = $cacheKey;
         $slug = str_contains($normalized, 'линия') ? 'line-1' : 'a-plus';
 
         $direction = CatalogDirection::find()->where(['slug' => $slug])->one();
@@ -26,7 +46,7 @@ class CatalogImportReferenceResolver
             throw new \RuntimeException('Направление «' . $label . '» не найдено в справочнике.');
         }
 
-        return $direction;
+        return $this->directionCache[$cacheKey] = $direction;
     }
 
     public function resolveFabricCollectionByName(string $name): ?CatalogFabricCollection
@@ -34,6 +54,11 @@ class CatalogImportReferenceResolver
         $name = trim($name);
         if ($name === '') {
             return null;
+        }
+
+        $cacheKey = mb_strtolower($name, 'UTF-8');
+        if (array_key_exists($cacheKey, $this->fabricCollectionCache)) {
+            return $this->fabricCollectionCache[$cacheKey];
         }
 
         $slug = SlugHelper::slugify($name);
@@ -64,14 +89,23 @@ class CatalogImportReferenceResolver
             return null;
         }
 
-        return CatalogFabricCollection::find()
+        $found = CatalogFabricCollection::find()
             ->where(['like', 'slug', $slug, false])
             ->one() ?: null;
+
+        $this->fabricCollectionCache[$cacheKey] = $found;
+
+        return $found;
     }
 
     public function resolveCollection(int $directionId, string $name): CatalogCollection
     {
         $name = trim($name);
+        $cacheKey = $directionId . '|' . mb_strtolower($name, 'UTF-8');
+        if (isset($this->collectionCache[$cacheKey])) {
+            return $this->collectionCache[$cacheKey];
+        }
+
         $baseSlug = SlugHelper::slugify($name) ?: 'collection';
         $directionSlug = $this->resolveDirectionSlug($directionId);
 
@@ -107,7 +141,7 @@ class CatalogImportReferenceResolver
             $collection->save(false);
         }
 
-        return $collection;
+        return $this->collectionCache[$cacheKey] = $collection;
     }
 
     private function resolveDirectionSlug(int $directionId): string
@@ -143,24 +177,29 @@ class CatalogImportReferenceResolver
             throw new \InvalidArgumentException('Название категории не может быть пустым.');
         }
 
+        $cacheKey = mb_strtolower($label, 'UTF-8');
+        if (isset($this->categoryCache[$cacheKey])) {
+            return $this->categoryCache[$cacheKey];
+        }
+
         $byLabel = CatalogCategory::find()
             ->where(['label' => $label, 'is_active' => true])
             ->orderBy(['sort_order' => SORT_ASC, 'id' => SORT_ASC])
             ->all();
 
         if (count($byLabel) === 1) {
-            return $byLabel[0];
+            return $this->categoryCache[$cacheKey] = $byLabel[0];
         }
 
         $slug = SlugHelper::slugify($label) ?: 'category';
         if ($byLabel !== []) {
             foreach ($byLabel as $category) {
                 if ($category->slug === $slug) {
-                    return $category;
+                    return $this->categoryCache[$cacheKey] = $category;
                 }
             }
 
-            return $byLabel[0];
+            return $this->categoryCache[$cacheKey] = $byLabel[0];
         }
 
         $category = CatalogCategory::find()->where(['slug' => $slug])->one();
@@ -175,12 +214,17 @@ class CatalogImportReferenceResolver
             $category->save(false);
         }
 
-        return $category;
+        return $this->categoryCache[$cacheKey] = $category;
     }
 
     public function resolveSubcategory(CatalogCategory $category, string $label): CatalogSubcategory
     {
         $label = trim($label);
+        $cacheKey = (int)$category->id . '|' . mb_strtolower($label, 'UTF-8');
+        if (isset($this->subcategoryCache[$cacheKey])) {
+            return $this->subcategoryCache[$cacheKey];
+        }
+
         $slug = SlugHelper::slugify($label) ?: 'item';
 
         $subcategory = CatalogSubcategory::find()
@@ -201,7 +245,7 @@ class CatalogImportReferenceResolver
             $subcategory->save(false);
         }
 
-        return $subcategory;
+        return $this->subcategoryCache[$cacheKey] = $subcategory;
     }
 
     public function ensurePriceCategoriesUpTo(int $maxNumber): void

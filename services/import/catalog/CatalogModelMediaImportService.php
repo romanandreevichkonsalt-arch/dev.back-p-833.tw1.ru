@@ -17,15 +17,21 @@ class CatalogModelMediaImportService
     public function __construct(
         private readonly MediaImportService $mediaImport = new MediaImportService(),
         private readonly CatalogModel3dFileUploadService $file3dUpload = new CatalogModel3dFileUploadService(),
+        private readonly CatalogModelImportMediaEnqueuer $mediaEnqueuer = new CatalogModelImportMediaEnqueuer(),
     ) {
     }
 
     /**
      * @return list<string> предупреждения (не удалось скачать медиа и т.п.)
      */
-    public function applyToModel(CatalogModel $model, CatalogModelImportRowDto $row, bool $importMedia = true): array
-    {
+    public function applyToModel(
+        CatalogModel $model,
+        CatalogModelImportRowDto $row,
+        CatalogModelImportOptions $options,
+        ?CatalogModelImportResult $result = null,
+    ): array {
         $warnings = [];
+        $importMedia = $options->shouldImportMedia();
 
         $this->applyNonDownloadFields($model, $row, $importMedia);
 
@@ -33,34 +39,52 @@ class CatalogModelMediaImportService
             return $warnings;
         }
 
+        if ($options->asyncMode && $options->importRunId !== null && $options->importRunId > 0 && $result !== null) {
+            $this->mediaEnqueuer->enqueueGalleryAndDimensions(
+                $model,
+                $row,
+                (int)$options->importRunId,
+                $result,
+                $warnings,
+            );
+        } else {
+            if ($row->galleryPhotoUrls !== []) {
+                $this->replaceGallery($model, CatalogModelImage::PURPOSE_INTERIOR, $row->galleryPhotoUrls, MediaFolder::SLUG_INTERIOR);
+            }
+
+            if ($row->dimensionPhotoUrls !== []) {
+                $this->replaceDimensionImages($model, $row->dimensionPhotoUrls);
+            } elseif ($row->dimensionPhotoFolderUrl !== null && $row->dimensionPhotoFolderUrl !== '') {
+                CatalogModelDimensionImage::deleteAll(['model_id' => $model->id]);
+            }
+        }
+
         if ($row->file3dUrl !== null && $row->file3dUrl !== '') {
             $url = trim($row->file3dUrl);
-            $warning = $this->persistFile3dFromSourceUrl($model, $url);
-            if ($warning !== null) {
-                $warnings[] = $warning;
+            if ($options->asyncMode) {
+                if ((int)$model->file_3d_id <= 0) {
+                    $model->file_3d_url = $url;
+                }
+            } else {
+                $warning = $this->persistFile3dFromSourceUrl($model, $url);
+                if ($warning !== null) {
+                    $warnings[] = $warning;
+                }
             }
         }
 
         if ($row->videoUrl !== null && $row->videoUrl !== '') {
-            $video = $this->mediaImport->importCatalogMedia(
-                $row->videoUrl,
-                'model-' . $model->id . '-video',
-                MediaFile::KIND_VIDEO,
-                MediaFolder::SLUG_VIDEO
-            );
-            if ($video !== null) {
-                $model->video_id = (int)$video->id;
+            if (!$options->asyncMode) {
+                $video = $this->mediaImport->importCatalogMedia(
+                    $row->videoUrl,
+                    'model-' . $model->id . '-video',
+                    MediaFile::KIND_VIDEO,
+                    MediaFolder::SLUG_VIDEO
+                );
+                if ($video !== null) {
+                    $model->video_id = (int)$video->id;
+                }
             }
-        }
-
-        if ($row->galleryPhotoUrls !== []) {
-            $this->replaceGallery($model, CatalogModelImage::PURPOSE_INTERIOR, $row->galleryPhotoUrls, MediaFolder::SLUG_INTERIOR);
-        }
-
-        if ($row->dimensionPhotoUrls !== []) {
-            $this->replaceDimensionImages($model, $row->dimensionPhotoUrls);
-        } elseif ($row->dimensionPhotoFolderUrl !== null && $row->dimensionPhotoFolderUrl !== '') {
-            CatalogModelDimensionImage::deleteAll(['model_id' => $model->id]);
         }
 
         return $warnings;
@@ -125,6 +149,9 @@ class CatalogModelMediaImportService
                 'sort_order' => $sortOrder,
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
+            if ($link->hasAttribute('source_url')) {
+                $link->source_url = mb_substr(trim($url), 0, 512);
+            }
             $link->save(false);
             $sortOrder++;
         }
@@ -155,6 +182,9 @@ class CatalogModelMediaImportService
                 'sort_order' => $sortOrder,
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
+            if ($link->hasAttribute('source_url')) {
+                $link->source_url = mb_substr(trim($url), 0, 512);
+            }
             $link->save(false);
             $sortOrder++;
         }

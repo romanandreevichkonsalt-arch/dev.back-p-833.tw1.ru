@@ -1,4 +1,11 @@
 (function () {
+    function confirmRemoveFabricGroup(group) {
+        var name = (group && group.getAttribute('data-fabric-name')) || 'коллекцию';
+        return window.confirm(
+            'Убрать «' + name + '» из тканей модели? Связь исчезнет после сохранения карточки.'
+        );
+    }
+
     function isGroupLinked(group) {
         return group.querySelector('[data-fabric-link-input]') !== null;
     }
@@ -186,7 +193,11 @@
         button.setAttribute('data-fabric-remove', '');
         button.textContent = 'Убрать';
         head.appendChild(button);
-        button.addEventListener('click', function () {
+        button.addEventListener('click', function (event) {
+            event.stopPropagation();
+            if (!confirmRemoveFabricGroup(group)) {
+                return;
+            }
             unlinkFabricGroup(group);
         });
     }
@@ -268,9 +279,13 @@
             button.addEventListener('click', function (event) {
                 event.stopPropagation();
                 var group = button.closest('[data-fabric-group]');
-                if (group) {
-                    unlinkFabricGroup(group);
+                if (!group) {
+                    return;
                 }
+                if (!confirmRemoveFabricGroup(group)) {
+                    return;
+                }
+                unlinkFabricGroup(group);
             });
         });
     }

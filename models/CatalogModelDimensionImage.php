@@ -18,6 +18,7 @@ class CatalogModelDimensionImage extends ActiveRecord
             [['model_id', 'media_file_id', 'sort_order'], 'integer'],
             [['created_at'], 'safe'],
             [['media_file_id'], 'unique', 'targetAttribute' => ['model_id', 'media_file_id']],
+            [['source_url'], 'string', 'max' => 512],
         ];
     }
 

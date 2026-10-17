@@ -23,30 +23,9 @@ final class CatalogModelFabricLinkAllService
     {
         @set_time_limit(0);
 
-        $now = date('Y-m-d H:i:s');
-        $linksAdded = (int)Yii::$app->db->createCommand(
-            <<<'SQL'
-INSERT INTO {{%catalog_model_fabric_collections}} (model_id, fabric_collection_id, created_at)
-SELECT m.id, fc.id, :now
-FROM {{%catalog_models}} m
-CROSS JOIN {{%catalog_fabric_collections}} fc
-WHERE fc.is_active = 1
-  AND NOT EXISTS (
-    SELECT 1
-    FROM {{%catalog_model_fabric_collections}} mf
-    WHERE mf.model_id = m.id AND mf.fabric_collection_id = fc.id
-  )
-SQL,
-            ['now' => $now]
-        )->execute();
-
-        $modelIds = (new \yii\db\Query())
-            ->select('id')
-            ->from('{{%catalog_models}}')
-            ->column();
-
+        $linksAdded = $this->insertMissingFabricLinks();
         $modelsSynced = 0;
-        foreach ($modelIds as $modelId) {
+        foreach ($this->getAllModelIds() as $modelId) {
             $model = CatalogModel::findOne((int)$modelId);
             if ($model === null) {
                 continue;
@@ -61,5 +40,48 @@ SQL,
             'links_added' => $linksAdded,
             'models_synced' => $modelsSynced,
         ];
+    }
+
+    public function insertMissingFabricLinks(): int
+    {
+        $now = date('Y-m-d H:i:s');
+
+        return (int)Yii::$app->db->createCommand(
+            <<<'SQL'
+INSERT INTO {{%catalog_model_fabric_collections}} (model_id, fabric_collection_id, created_at)
+SELECT m.id, fc.id, :now
+FROM {{%catalog_models}} m
+CROSS JOIN {{%catalog_fabric_collections}} fc
+WHERE fc.is_active = 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM {{%catalog_model_fabric_collections}} mf
+    WHERE mf.model_id = m.id AND mf.fabric_collection_id = fc.id
+  )
+SQL,
+            ['now' => $now]
+        )->execute();
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function getAllModelIds(): array
+    {
+        return array_map('intval', (new \yii\db\Query())
+            ->select('id')
+            ->from('{{%catalog_models}}')
+            ->orderBy(['id' => SORT_ASC])
+            ->column());
+    }
+
+    public function syncModelById(int $modelId): void
+    {
+        $model = CatalogModel::findOne($modelId);
+        if ($model === null) {
+            return;
+        }
+
+        $this->productSync->syncForModel($model);
     }
 }

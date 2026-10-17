@@ -123,8 +123,8 @@ class FabricRegistryImporter
                         $updated = $this->updateExistingLink($row, $options, $importRun?->id, $rowResult, $lookup);
                         if ($updated) {
                             $rowResult->action = FabricRegistryImportRowResult::ACTION_UPDATE;
-                            $result->stats['links_updated']++;
-                            $result->stats['links_conflict'] = max(0, $result->stats['links_conflict'] - 1);
+                            $this->incrementStat($result, 'links_updated');
+                            $result->stats['links_conflict'] = max(0, (int)($result->stats['links_conflict'] ?? 0) - 1);
                         }
                         $result->pendingConflict = null;
                         $this->clearConflictResolutionOnce($options, $importRun);
@@ -193,7 +193,7 @@ class FabricRegistryImporter
 
             $result->success = false;
             $result->aborted = true;
-            $result->stats['errors']++;
+            $this->incrementStat($result, 'errors');
 
             if ($importRun !== null) {
                 $importRun->assignErrorMessage($exception->getMessage());
@@ -845,50 +845,55 @@ class FabricRegistryImporter
             ->count();
     }
 
+    private function incrementStat(FabricRegistryImportResult $result, string $key, int $by = 1): void
+    {
+        $result->stats[$key] = (int)($result->stats[$key] ?? 0) + $by;
+    }
+
     private function updateStats(FabricRegistryImportResult $result, FabricRegistryImportRowResult $rowResult): void
     {
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_SKIP) {
-            $result->stats['rows_skipped']++;
+            $this->incrementStat($result, 'rows_skipped');
         }
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_CREATE) {
-            $result->stats['links_created']++;
+            $this->incrementStat($result, 'links_created');
         }
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_UPDATE) {
-            $result->stats['links_updated']++;
+            $this->incrementStat($result, 'links_updated');
         }
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_CONFLICT) {
-            $result->stats['links_conflict']++;
+            $this->incrementStat($result, 'links_conflict');
         }
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_ERROR) {
-            $result->stats['errors']++;
+            $this->incrementStat($result, 'errors');
         }
         if ($rowResult->photoImported) {
-            $result->stats['photo_imported']++;
+            $this->incrementStat($result, 'photo_imported');
         }
         if ($rowResult->photoQueued) {
-            $result->stats['photo_queued']++;
+            $this->incrementStat($result, 'photo_queued');
         }
         if ($rowResult->photoSkipped) {
-            $result->stats['photo_skipped']++;
+            $this->incrementStat($result, 'photo_skipped');
         }
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_SKIP
             && str_contains(implode(' ', $rowResult->messages), 'import_row_hash')
         ) {
-            $result->stats['links_skipped_row_hash']++;
+            $this->incrementStat($result, 'links_skipped_row_hash');
         }
 
         foreach ($rowResult->messages as $message) {
             if (str_contains($message, 'Создан цвет')) {
-                $result->stats['colors_created']++;
+                $this->incrementStat($result, 'colors_created');
             }
             if (str_contains($message, 'Создана коллекция')) {
-                $result->stats['collections_created']++;
+                $this->incrementStat($result, 'collections_created');
             }
             if (str_contains($message, 'Обновлена коллекция')) {
-                $result->stats['collections_updated']++;
+                $this->incrementStat($result, 'collections_updated');
             }
             if (str_contains($message, 'Создана ценовая категория')) {
-                $result->stats['price_categories_created']++;
+                $this->incrementStat($result, 'price_categories_created');
             }
         }
     }

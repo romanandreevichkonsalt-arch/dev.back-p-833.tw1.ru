@@ -448,7 +448,7 @@ class SearchCatalogPriorityService
         return null;
     }
 
-    private function resolveDefaultProductIdForModel(int $modelId, int $directionId): int
+    public function resolveDefaultProductIdForModel(int $modelId, int $directionId): int
     {
         $product = CatalogProduct::find()
             ->alias('p')
@@ -463,6 +463,92 @@ class SearchCatalogPriorityService
             ->one();
 
         return $product !== null ? (int)$product->id : 0;
+    }
+
+    public function remapSampleProductId(int $modelId, int $fromProductId, int $toProductId): void
+    {
+        if (
+            $modelId <= 0
+            || $fromProductId <= 0
+            || $toProductId <= 0
+            || $fromProductId === $toProductId
+            || \Yii::$app->db->schema->getTableSchema(SearchCatalogPriorityModel::tableName(), true) === null
+        ) {
+            return;
+        }
+
+        SearchCatalogPriorityModel::updateAll(
+            ['sample_catalog_product_id' => $toProductId],
+            [
+                'catalog_model_id' => $modelId,
+                'sample_catalog_product_id' => $fromProductId,
+            ]
+        );
+    }
+
+    /**
+     * @param array<int, int> $productIdByFabricColor fabricColorId => catalogProductId
+     */
+    public function findReplacementSampleProductId(
+        int $modelId,
+        int $directionId,
+        array $productIdByFabricColor,
+        ?int $preferredFabricColorId = null,
+    ): int {
+        if ($preferredFabricColorId !== null && $preferredFabricColorId > 0) {
+            $mapped = (int)($productIdByFabricColor[$preferredFabricColorId] ?? 0);
+            if ($mapped > 0) {
+                return $mapped;
+            }
+        }
+
+        if ($productIdByFabricColor !== []) {
+            $ids = array_values($productIdByFabricColor);
+            sort($ids, SORT_NUMERIC);
+
+            return (int)$ids[0];
+        }
+
+        return $this->resolveDefaultProductIdForModel($modelId, $directionId);
+    }
+
+    public function reconcileSampleProductsForModel(int $modelId): void
+    {
+        if (
+            $modelId <= 0
+            || \Yii::$app->db->schema->getTableSchema(SearchCatalogPriorityModel::tableName(), true) === null
+        ) {
+            return;
+        }
+
+        $rows = SearchCatalogPriorityModel::find()
+            ->where(['catalog_model_id' => $modelId])
+            ->all();
+
+        foreach ($rows as $row) {
+            $productId = (int)$row->sample_catalog_product_id;
+            if ($productId > 0) {
+                $valid = CatalogProduct::find()
+                    ->where([
+                        'id' => $productId,
+                        'model_id' => $modelId,
+                        'is_custom' => false,
+                        'is_active' => true,
+                    ])
+                    ->exists();
+                if ($valid) {
+                    continue;
+                }
+            }
+
+            $replacementId = $this->resolveDefaultProductIdForModel($modelId, (int)$row->direction_id);
+            if ($replacementId <= 0) {
+                continue;
+            }
+
+            $row->sample_catalog_product_id = $replacementId;
+            $row->save(false);
+        }
     }
 
     private function modelBelongsToDirection(CatalogModel $model, int $directionId): bool
