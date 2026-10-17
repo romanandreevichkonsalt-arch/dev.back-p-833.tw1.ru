@@ -22,6 +22,7 @@ class CatalogImportMediaQueue extends ActiveRecord
             [['import_run_id', 'row_number', 'source_url', 'status', 'created_at'], 'required'],
             [['import_run_id', 'row_number', 'media_file_id', 'entity_id'], 'integer'],
             [['source_url'], 'string', 'max' => 512],
+            [['url_fingerprint'], 'string', 'max' => 64],
             [['url_type', 'status', 'entity_type'], 'string', 'max' => 64],
             [['resolved_filename'], 'string', 'max' => 255],
             [['error_message'], 'string'],

@@ -26,6 +26,7 @@ class FabricRegistryImportRowResult
     public ?int $linkId = null;
     public bool $photoSkipped = false;
     public bool $photoImported = false;
+    public bool $photoQueued = false;
 
     public function addWarning(string $message): void
     {
@@ -55,6 +56,7 @@ class FabricRegistryImportRowResult
             'link_id' => $this->linkId,
             'photo_skipped' => $this->photoSkipped,
             'photo_imported' => $this->photoImported,
+            'photo_queued' => $this->photoQueued,
         ];
     }
 }

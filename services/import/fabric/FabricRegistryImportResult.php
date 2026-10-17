@@ -24,6 +24,11 @@ class FabricRegistryImportResult
         'price_categories_created' => 0,
         'photo_imported' => 0,
         'photo_skipped' => 0,
+        'photo_queued' => 0,
+        'media_dedup_skipped' => 0,
+        'collections_cache_hits' => 0,
+        'links_cache_hits' => 0,
+        'links_skipped_row_hash' => 0,
         'errors' => 0,
     ];
     /** @var array<string, mixed>|null */

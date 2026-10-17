@@ -18,6 +18,7 @@ class FabricRegistryImporter
     public function __construct(
         private readonly FabricRegistrySpreadsheetReader $spreadsheetReader = new FabricRegistrySpreadsheetReader(),
         private readonly MediaImportService $mediaImportService = new MediaImportService(),
+        private readonly FabricImportMediaEnqueuer $mediaEnqueuer = new FabricImportMediaEnqueuer(),
     ) {
     }
 
@@ -58,22 +59,30 @@ class FabricRegistryImporter
                     $startIndex,
                     (int)$importRun->total_rows,
                     CatalogImportRun::PHASE_PARSING,
-                    'Чтение файла…'
+                    'Чтение файла…',
+                    autoComplete: false,
                 );
             }
 
-            $rows = $this->spreadsheetReader->read($filePath);
-            $totalRows = count($rows);
+            $parseStarted = microtime(true);
+            $fullRows = FabricRegistrySpreadsheetRowCache::loadIfFresh($filePath);
+            if ($fullRows === null) {
+                $fullRows = $this->spreadsheetReader->read($filePath, 0);
+            }
+            $totalRows = count($fullRows);
             $result->stats['rows_total'] = $totalRows;
+            $result->stats['timing_parse_ms'] = (int)round((microtime(true) - $parseStarted) * 1000);
 
             if ($importRun !== null) {
                 $importRun->total_rows = $totalRows;
                 $importRun->save(false, ['total_rows']);
             }
 
-            if ($startIndex > 0) {
-                $rows = array_slice($rows, $startIndex);
-            }
+            $prefetchStarted = microtime(true);
+            $lookup = FabricRegistryImportLookup::buildFromRows($fullRows);
+            $result->stats['timing_prefetch_ms'] = (int)round((microtime(true) - $prefetchStarted) * 1000);
+
+            $rows = $startIndex > 0 ? array_slice($fullRows, $startIndex) : $fullRows;
 
             foreach ($rows as $offset => $row) {
                 if ($result->aborted) {
@@ -81,7 +90,7 @@ class FabricRegistryImporter
                 }
 
                 $absoluteIndex = $startIndex + $offset;
-                $rowResult = $this->importRow($row, $options, $importRun?->id);
+                $rowResult = $this->importRow($row, $options, $importRun?->id, $lookup);
                 $result->addRow($rowResult);
                 $this->updateStats($result, $rowResult);
 
@@ -111,7 +120,7 @@ class FabricRegistryImporter
                     }
 
                     if ($conflictAction === FabricRegistryImportOptions::CONFLICT_UPDATE) {
-                        $updated = $this->updateExistingLink($row, $options, $importRun?->id, $rowResult);
+                        $updated = $this->updateExistingLink($row, $options, $importRun?->id, $rowResult, $lookup);
                         if ($updated) {
                             $rowResult->action = FabricRegistryImportRowResult::ACTION_UPDATE;
                             $result->stats['links_updated']++;
@@ -129,7 +138,8 @@ class FabricRegistryImporter
                             $processed,
                             $totalRows,
                             CatalogImportRun::PHASE_PROCESSING,
-                            sprintf('Обработано %d строк из %d', $processed, $totalRows)
+                            sprintf('Обработано %d строк из %d', $processed, $totalRows),
+                            autoComplete: false,
                         );
                         $this->persistRunStats($importRun, $result);
                     }
@@ -144,11 +154,37 @@ class FabricRegistryImporter
                 }
             }
 
+            $result->stats['collections_cache_hits'] = count($lookup->collectionsBySlug);
+            $result->stats['links_cache_hits'] = count($lookup->linksByKey);
+
             if ($importRun !== null && !($result->aborted && $options->asyncMode)) {
-                $finalStatus = $result->aborted
-                    ? CatalogImportRun::STATUS_ABORTED
-                    : ($options->dryRun ? 'dry_run' : CatalogImportRun::STATUS_COMPLETED);
-                $this->persistRunState($importRun, $result, $finalStatus);
+                if ($result->aborted) {
+                    $this->persistRunState($importRun, $result, CatalogImportRun::STATUS_ABORTED);
+                } elseif ($options->dryRun) {
+                    $this->persistRunState($importRun, $result, 'dry_run');
+                } elseif ($options->asyncMode && $options->shouldImportMedia() && $this->countPendingMedia($importRun->id) > 0) {
+                    $importRun->phase = CatalogImportRun::PHASE_MEDIA;
+                    $importRun->phase_message = 'Строки обработаны, загрузка фото…';
+                    $importRun->status = CatalogImportRun::STATUS_PROCESSING;
+                    $importRun->finished_at = null;
+                    if ($importRun->supportsMediaProgress()) {
+                        $importRun->media_total = $this->countPendingMedia($importRun->id);
+                        $importRun->media_processed_rows = 0;
+                    }
+                    $importRun->processed_rows = $totalRows;
+                    $this->persistRunStats($importRun, $result);
+                    $importRun->save(false);
+                } elseif ($options->asyncMode) {
+                    $importRun->processed_rows = $totalRows;
+                    $importRun->phase = CatalogImportRun::PHASE_PROCESSING;
+                    $importRun->phase_message = sprintf('Обработано %d строк из %d', $totalRows, $totalRows);
+                    $importRun->status = CatalogImportRun::STATUS_PROCESSING;
+                    $importRun->finished_at = null;
+                    $this->persistRunStats($importRun, $result);
+                    $importRun->save(false);
+                } else {
+                    $this->persistRunState($importRun, $result, CatalogImportRun::STATUS_COMPLETED);
+                }
             }
         } catch (\Throwable $exception) {
             if ($transaction !== null && $transaction->isActive) {
@@ -224,7 +260,8 @@ class FabricRegistryImporter
     private function importRow(
         FabricRegistryRowDto $row,
         FabricRegistryImportOptions $options,
-        ?int $importRunId
+        ?int $importRunId,
+        FabricRegistryImportLookup $lookup,
     ): FabricRegistryImportRowResult {
         $rowResult = new FabricRegistryImportRowResult();
         $rowResult->rowNumber = $row->rowNumber;
@@ -247,16 +284,11 @@ class FabricRegistryImporter
         }
 
         $collectionSlug = SlugHelper::slugify($row->collectionName);
-        $existingCollection = CatalogFabricCollection::find()->where(['slug' => $collectionSlug])->one();
-        $existingLink = null;
+        $existingCollection = $lookup->collectionBySlug($collectionSlug);
 
+        $existingLink = null;
         if ($existingCollection !== null) {
-            $existingLink = CatalogFabricColor::find()
-                ->where([
-                    'fabric_collection_id' => $existingCollection->id,
-                    'design_code' => $row->colorName,
-                ])
-                ->one();
+            $existingLink = $lookup->linkFor((int)$existingCollection->id, $row->colorName);
         }
 
         if ($existingLink !== null && !$options->updateExisting && $options->resolveConflictAction() !== FabricRegistryImportOptions::CONFLICT_UPDATE) {
@@ -292,12 +324,26 @@ class FabricRegistryImporter
             return $rowResult;
         }
 
-        $collection = $this->upsertCollection($row, $existingCollection, $options, $rowResult);
+        if (
+            $existingLink !== null
+            && $existingLink->hasAttribute('import_row_hash')
+            && trim((string)$existingLink->import_row_hash) === $row->rowHash()
+            && !$options->updateExisting
+        ) {
+            $rowResult->action = FabricRegistryImportRowResult::ACTION_SKIP;
+            $rowResult->addMessage('Строка без изменений (import_row_hash).');
+
+            return $rowResult;
+        }
+
+        $collection = $this->upsertCollection($row, $existingCollection, $options, $rowResult, $lookup);
         $rowResult->collectionId = (int)$collection->id;
 
         $colorId = $this->resolveColorId($row, $options, $rowResult);
         $link = $existingLink ?? new CatalogFabricColor();
         $isNewLink = $link->isNewRecord;
+
+        $previousSourcePhotoUrl = $this->previousSourcePhotoUrl($link);
 
         $link->fabric_collection_id = (int)$collection->id;
         $link->design_code = $row->colorName;
@@ -306,6 +352,9 @@ class FabricRegistryImporter
         $link->source_photo_url = $row->textureUrl;
         $link->is_recommended_fabric = $row->isRecommendedFabric;
         $link->position_number = $row->positionNumber;
+        if ($link->hasAttribute('import_row_hash')) {
+            $link->import_row_hash = $row->rowHash();
+        }
 
         if (!$link->save()) {
             $rowResult->action = FabricRegistryImportRowResult::ACTION_ERROR;
@@ -314,12 +363,22 @@ class FabricRegistryImporter
             return $rowResult;
         }
 
+        $lookup->rememberLink($link);
+
         $rowResult->linkId = (int)$link->id;
         $rowResult->action = $isNewLink
             ? FabricRegistryImportRowResult::ACTION_CREATE
             : FabricRegistryImportRowResult::ACTION_UPDATE;
 
-        $this->importMediaForLink($row, $link, $collectionSlug, $importRunId, $rowResult, $options);
+        $this->importMediaForLink(
+            $row,
+            $link,
+            $collectionSlug,
+            $importRunId,
+            $rowResult,
+            $options,
+            $previousSourcePhotoUrl,
+        );
         $link->save(false);
 
         return $rowResult;
@@ -329,24 +388,20 @@ class FabricRegistryImporter
         FabricRegistryRowDto $row,
         FabricRegistryImportOptions $options,
         ?int $importRunId,
-        FabricRegistryImportRowResult $rowResult
+        FabricRegistryImportRowResult $rowResult,
+        FabricRegistryImportLookup $lookup,
     ): bool {
         $collectionSlug = SlugHelper::slugify($row->collectionName);
-        $existingCollection = CatalogFabricCollection::find()->where(['slug' => $collectionSlug])->one();
+        $existingCollection = $lookup->collectionBySlug($collectionSlug);
         if ($existingCollection === null) {
             return false;
         }
 
         if ($options->shouldWrite()) {
-            $this->upsertCollection($row, $existingCollection, $options, $rowResult);
+            $this->upsertCollection($row, $existingCollection, $options, $rowResult, $lookup);
         }
 
-        $link = CatalogFabricColor::find()
-            ->where([
-                'fabric_collection_id' => $existingCollection->id,
-                'design_code' => $row->colorName,
-            ])
-            ->one();
+        $link = $lookup->linkFor((int)$existingCollection->id, $row->colorName);
         if ($link === null) {
             return false;
         }
@@ -355,12 +410,17 @@ class FabricRegistryImporter
             return true;
         }
 
+        $previousSourcePhotoUrl = $this->previousSourcePhotoUrl($link);
+
         $colorId = $this->resolveColorId($row, $options, $rowResult);
         $link->color_id = $colorId;
         $link->import_comment = $row->importComment;
         $link->source_photo_url = $row->textureUrl;
         $link->is_recommended_fabric = $row->isRecommendedFabric;
         $link->position_number = $row->positionNumber;
+        if ($link->hasAttribute('import_row_hash')) {
+            $link->import_row_hash = $row->rowHash();
+        }
 
         if (!$link->save()) {
             $rowResult->addWarning('Ошибка обновления цвета: ' . implode(', ', $link->getFirstErrors()));
@@ -368,10 +428,20 @@ class FabricRegistryImporter
             return false;
         }
 
+        $lookup->rememberLink($link);
+
         $rowResult->collectionId = (int)$existingCollection->id;
         $rowResult->linkId = (int)$link->id;
 
-        $this->importMediaForLink($row, $link, $collectionSlug, $importRunId, $rowResult, $options);
+        $this->importMediaForLink(
+            $row,
+            $link,
+            $collectionSlug,
+            $importRunId,
+            $rowResult,
+            $options,
+            $previousSourcePhotoUrl,
+        );
         $link->save(false);
 
         return true;
@@ -381,7 +451,8 @@ class FabricRegistryImporter
         FabricRegistryRowDto $row,
         ?CatalogFabricCollection $existing,
         FabricRegistryImportOptions $options,
-        FabricRegistryImportRowResult $rowResult
+        FabricRegistryImportRowResult $rowResult,
+        FabricRegistryImportLookup $lookup,
     ): CatalogFabricCollection {
         $collection = $existing ?? new CatalogFabricCollection();
         $isNew = $collection->isNewRecord;
@@ -394,24 +465,28 @@ class FabricRegistryImporter
             $row->priceCategoryLabelA,
             self::PRICE_LINE_A,
             $options,
-            $rowResult
+            $rowResult,
+            $lookup
         );
         $collection->price_category_line1_id = $this->resolvePriceCategoryId(
             $row->priceCategoryLabelLine1,
             self::PRICE_LINE_LINE1,
             $options,
-            $rowResult
+            $rowResult,
+            $lookup
         );
         $collection->import_source = $options->importSource;
         $collection->import_row_hash = $row->rowHash();
         $collection->is_active = true;
 
-        if (!$collection->save()) {
+        if (!$collection->save(false)) {
             throw new \RuntimeException(
                 'Не удалось сохранить коллекцию «' . $row->collectionName . '»: '
                 . implode(', ', $collection->getFirstErrors())
             );
         }
+
+        $lookup->rememberCollection($collection);
 
         if ($isNew) {
             $rowResult->addMessage('Создана коллекция «' . $row->collectionName . '».');
@@ -451,7 +526,8 @@ class FabricRegistryImporter
         ?string $label,
         string $line,
         FabricRegistryImportOptions $options,
-        FabricRegistryImportRowResult $rowResult
+        FabricRegistryImportRowResult $rowResult,
+        FabricRegistryImportLookup $lookup,
     ): ?int {
         if ($label === null || trim($label) === '') {
             return null;
@@ -468,14 +544,14 @@ class FabricRegistryImporter
         }
 
         if ($options->shouldWrite()) {
-            $this->ensurePriceCategoriesUpTo($number, $rowResult);
-            $category = CatalogPriceCategory::find()->where(['number' => $number])->one();
+            $this->ensurePriceCategoriesUpTo($number, $rowResult, $lookup);
+            $category = $lookup->priceCategory($number);
             if ($category !== null) {
                 $this->applyPriceCategoryFromParsedLabel($category, $parsed, $line, $rowResult);
             }
         }
 
-        $category = CatalogPriceCategory::find()->where(['number' => $number])->one();
+        $category = $lookup->priceCategory($number);
 
         return $category !== null ? (int)$category->id : null;
     }
@@ -544,10 +620,13 @@ class FabricRegistryImporter
         );
     }
 
-    private function ensurePriceCategoriesUpTo(int $number, FabricRegistryImportRowResult $rowResult): void
-    {
+    private function ensurePriceCategoriesUpTo(
+        int $number,
+        FabricRegistryImportRowResult $rowResult,
+        FabricRegistryImportLookup $lookup,
+    ): void {
         for ($i = 1; $i <= $number; $i++) {
-            $category = CatalogPriceCategory::find()->where(['number' => $i])->one();
+            $category = $lookup->priceCategory($i);
             if ($category !== null) {
                 continue;
             }
@@ -565,6 +644,7 @@ class FabricRegistryImporter
                 );
             }
 
+            $lookup->rememberPriceCategory($category);
             $rowResult->addMessage('Создана ценовая категория #' . $i . '.');
         }
     }
@@ -632,13 +712,34 @@ class FabricRegistryImporter
         ?int $importRunId,
         FabricRegistryImportRowResult $rowResult,
         FabricRegistryImportOptions $options,
+        ?string $previousSourcePhotoUrl = null,
     ): void {
         if (!$options->shouldImportMedia()) {
             return;
         }
 
+        if ($options->asyncMode && $importRunId !== null && $importRunId > 0) {
+            $this->mediaEnqueuer->enqueueForLink(
+                $row,
+                $link,
+                $importRunId,
+                $rowResult,
+                $previousSourcePhotoUrl,
+            );
+
+            return;
+        }
+
         $textureUrl = $row->textureUrl;
         if ($textureUrl === null || $textureUrl === '') {
+            return;
+        }
+
+        $skipReason = FabricImportPhotoSkipEvaluator::skipReason($link, $row, $previousSourcePhotoUrl);
+        if ($skipReason !== null) {
+            $rowResult->photoSkipped = true;
+            $rowResult->addMessage($skipReason);
+
             return;
         }
 
@@ -661,7 +762,7 @@ class FabricRegistryImporter
                 $downloadUrl,
                 $collectionSlug,
                 $mediaSlug,
-                $importRunId,
+                null,
                 $row->rowNumber
             );
             if ($media === null) {
@@ -675,12 +776,29 @@ class FabricRegistryImporter
             } else {
                 $link->pbr_media_id = (int)$media->id;
             }
+            if ($link->hasAttribute('import_media_pending')) {
+                $link->import_media_pending = false;
+            }
+            if ($link->hasAttribute('import_media_fingerprint')) {
+                $link->import_media_fingerprint = $this->mediaEnqueuer->urlFingerprint($downloadUrl);
+            }
             $rowResult->photoImported = true;
             $rowResult->addMessage('Файл сохранён в папку «Ткани».');
         } catch (\Throwable $exception) {
             $rowResult->photoSkipped = true;
             $rowResult->addWarning('Ошибка загрузки в медиатеку: ' . $exception->getMessage());
         }
+    }
+
+    private function previousSourcePhotoUrl(CatalogFabricColor $link): ?string
+    {
+        if ($link->isNewRecord) {
+            return null;
+        }
+
+        $url = trim((string)($link->source_photo_url ?? ''));
+
+        return $url !== '' ? $url : null;
     }
 
     private function previewMedia(FabricRegistryRowDto $row, FabricRegistryImportRowResult $rowResult): void
@@ -716,6 +834,17 @@ class FabricRegistryImporter
         ];
     }
 
+    private function countPendingMedia(int $importRunId): int
+    {
+        return (int)\app\models\CatalogImportMediaQueue::find()
+            ->where([
+                'import_run_id' => $importRunId,
+                'status' => \app\models\CatalogImportMediaQueue::STATUS_PENDING,
+                'entity_type' => 'fabric',
+            ])
+            ->count();
+    }
+
     private function updateStats(FabricRegistryImportResult $result, FabricRegistryImportRowResult $rowResult): void
     {
         if ($rowResult->action === FabricRegistryImportRowResult::ACTION_SKIP) {
@@ -736,8 +865,16 @@ class FabricRegistryImporter
         if ($rowResult->photoImported) {
             $result->stats['photo_imported']++;
         }
+        if ($rowResult->photoQueued) {
+            $result->stats['photo_queued']++;
+        }
         if ($rowResult->photoSkipped) {
             $result->stats['photo_skipped']++;
+        }
+        if ($rowResult->action === FabricRegistryImportRowResult::ACTION_SKIP
+            && str_contains(implode(' ', $rowResult->messages), 'import_row_hash')
+        ) {
+            $result->stats['links_skipped_row_hash']++;
         }
 
         foreach ($rowResult->messages as $message) {

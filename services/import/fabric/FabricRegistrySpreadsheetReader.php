@@ -8,6 +8,7 @@ use app\services\import\SpreadsheetGridHelper;
 use app\services\import\SpreadsheetSheetResolver;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use Yii;
 
 class FabricRegistrySpreadsheetReader
 {
@@ -34,19 +35,45 @@ class FabricRegistrySpreadsheetReader
     /**
      * @return FabricRegistryRowDto[]
      */
-    public function read(string $filePath): array
+    public function read(string $filePath, int $startIndex = 0): array
     {
         SpreadsheetFormatValidator::assertReadableExcel($filePath);
 
-        if (class_exists(IOFactory::class)) {
-            try {
-                return $this->readViaPhpSpreadsheet($filePath);
-            } catch (\Throwable) {
-                // Битая установка PhpSpreadsheet или нестандартный файл — читаем .xlsx напрямую.
+        if ($startIndex > 0) {
+            $cached = FabricRegistrySpreadsheetRowCache::loadIfFresh($filePath);
+            if ($cached !== null) {
+                Yii::info(
+                    sprintf('[PARSE] resume from row cache, startIndex=%d, total=%d', $startIndex, count($cached)),
+                    'fabric-import'
+                );
+
+                return array_slice($cached, $startIndex);
             }
         }
 
-        return $this->readViaSimpleXlsx($filePath);
+        $parseStarted = microtime(true);
+        if (class_exists(IOFactory::class)) {
+            try {
+                $rows = $this->readViaPhpSpreadsheet($filePath);
+            } catch (\Throwable) {
+                // Битая установка PhpSpreadsheet или нестандартный файл — читаем .xlsx напрямую.
+                $rows = $this->readViaSimpleXlsx($filePath);
+            }
+        } else {
+            $rows = $this->readViaSimpleXlsx($filePath);
+        }
+
+        FabricRegistrySpreadsheetRowCache::save($filePath, $rows);
+        Yii::info(
+            sprintf('[PARSE] rows=%d ms=%d', count($rows), (int)round((microtime(true) - $parseStarted) * 1000)),
+            'fabric-import'
+        );
+
+        if ($startIndex > 0) {
+            return array_slice($rows, $startIndex);
+        }
+
+        return $rows;
     }
 
     /**
@@ -54,24 +81,61 @@ class FabricRegistrySpreadsheetReader
      */
     private function readViaPhpSpreadsheet(string $filePath): array
     {
-        $spreadsheet = IOFactory::load($filePath);
-        $sheet = SpreadsheetSheetResolver::findSheet($spreadsheet, [self::SHEET_FABRICS]);
-        if ($sheet !== null) {
-            return $this->readRegistrySheet($sheet);
-        }
+        $format = $this->detectWorkbookFormat($filePath);
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $readerType = $extension === 'xls' ? 'Xls' : 'Xlsx';
+        $reader = IOFactory::createReader($readerType);
+        $reader->setReadDataOnly(true);
 
-        if (SpreadsheetSheetResolver::hasSheets($spreadsheet, [
-            FabricClientSpreadsheetReader::SHEET_COLLECTIONS,
-            FabricClientSpreadsheetReader::SHEET_COLORS,
-        ])) {
+        if ($format === 'client') {
+            $reader->setLoadSheetsOnly([
+                FabricClientSpreadsheetReader::SHEET_COLLECTIONS,
+                FabricClientSpreadsheetReader::SHEET_COLORS,
+            ]);
+            $spreadsheet = $reader->load($filePath);
+
             return (new FabricClientSpreadsheetReader())->read($spreadsheet);
         }
 
-        throw SpreadsheetSheetResolver::sheetNotFoundException(
-            self::SHEET_FABRICS,
-            $spreadsheet,
-            ['Ожидается лист «Ткани и кожа» (реестр v2) или листы «Коллекции» + «Цвета» (клиентский шаблон).'],
+        $reader->setLoadSheetsOnly([self::SHEET_FABRICS]);
+        $reader->setReadFilter(new FabricRegistrySheetReadFilter());
+        $spreadsheet = $reader->load($filePath);
+        $sheet = SpreadsheetSheetResolver::findSheet($spreadsheet, [self::SHEET_FABRICS]);
+        if ($sheet === null) {
+            throw SpreadsheetSheetResolver::sheetNotFoundException(
+                self::SHEET_FABRICS,
+                $spreadsheet,
+                ['Ожидается лист «Ткани и кожа» (реестр v2) или листы «Коллекции» + «Цвета» (клиентский шаблон).'],
+            );
+        }
+
+        return $this->readRegistrySheet($sheet);
+    }
+
+    /**
+     * @return 'registry'|'client'
+     */
+    private function detectWorkbookFormat(string $filePath): string
+    {
+        $reader = new SimpleXlsxSheetReader();
+        $names = $reader->listSheetNames($filePath);
+        $normalized = array_map(
+            static fn (string $name): string => SpreadsheetSheetResolver::normalizeName($name),
+            $names
         );
+
+        $registryKey = SpreadsheetSheetResolver::normalizeName(self::SHEET_FABRICS);
+        if (in_array($registryKey, $normalized, true)) {
+            return 'registry';
+        }
+
+        $collectionsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLLECTIONS);
+        $colorsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLORS);
+        if (in_array($collectionsKey, $normalized, true) && in_array($colorsKey, $normalized, true)) {
+            return 'client';
+        }
+
+        return 'registry';
     }
 
     /**
@@ -81,20 +145,27 @@ class FabricRegistrySpreadsheetReader
     {
         $reader = new SimpleXlsxSheetReader();
         $sheetNames = $reader->listSheetNames($filePath);
-        $grids = $reader->readAllSheetsGrids($filePath);
+        $format = $this->detectWorkbookFormat($filePath);
 
+        if ($format === 'client') {
+            $grids = $reader->readSheetsGrids($filePath, [
+                FabricClientSpreadsheetReader::SHEET_COLLECTIONS,
+                FabricClientSpreadsheetReader::SHEET_COLORS,
+            ]);
+            $collectionsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLLECTIONS);
+            $colorsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLORS);
+            if (isset($grids[$collectionsKey], $grids[$colorsKey])) {
+                return (new FabricClientSpreadsheetReader())->readFromGrids(
+                    $grids[$collectionsKey],
+                    $grids[$colorsKey]
+                );
+            }
+        }
+
+        $grids = $reader->readSheetsGrids($filePath, [self::SHEET_FABRICS]);
         $registryKey = SpreadsheetSheetResolver::normalizeName(self::SHEET_FABRICS);
         if (isset($grids[$registryKey])) {
             return $this->readRegistryGrid($grids[$registryKey]);
-        }
-
-        $collectionsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLLECTIONS);
-        $colorsKey = SpreadsheetSheetResolver::normalizeName(FabricClientSpreadsheetReader::SHEET_COLORS);
-        if (isset($grids[$collectionsKey], $grids[$colorsKey])) {
-            return (new FabricClientSpreadsheetReader())->readFromGrids(
-                $grids[$collectionsKey],
-                $grids[$colorsKey]
-            );
         }
 
         throw SpreadsheetSheetResolver::sheetNotFoundExceptionFromNames(

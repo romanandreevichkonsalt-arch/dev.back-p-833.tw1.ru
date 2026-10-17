@@ -168,28 +168,120 @@ class MediaImportService
         }
 
         [$tempPath, $downloadedFilename] = $this->downloadToTempFile($url, $kind, true);
-        try {
-            $storageBasename = MediaContentValidator::guessStorageBasename(
-                $tempPath,
-                $preferredBasename,
-                $downloadedFilename
-            );
-            $originalFilename = $downloadedFilename !== null && trim($downloadedFilename) !== ''
-                ? MediaContentValidator::normalizeFilename(trim($downloadedFilename))
-                : $storageBasename;
 
-            return $this->storage->importFromPath(
+        try {
+            return $this->importFromTempPath(
                 $tempPath,
-                $storageBasename,
+                $url,
+                $preferredBasename,
                 $kind,
                 $folderSlug,
-                $originalFilename
+                $downloadedFilename
             );
         } finally {
             if (is_file($tempPath)) {
                 @unlink($tempPath);
             }
         }
+    }
+
+    public function importFabricTextureFromDownloadedFile(
+        string $tempPath,
+        string $sourceUrl,
+        string $collectionSlug,
+        string $designCode,
+        ?string $downloadedFilename = null,
+        bool $generateImageVariants = true,
+    ): MediaFile {
+        $extension = FabricMediaNaming::extensionFromUrl($sourceUrl);
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+        $kind = in_array($extension, $imageExtensions, true)
+            ? MediaFile::KIND_IMAGE
+            : MediaFile::KIND_DOCUMENT;
+
+        return $this->importFromTempPath(
+            $tempPath,
+            $sourceUrl,
+            FabricMediaNaming::swatch($collectionSlug, $designCode, $extension),
+            $kind,
+            MediaFolder::SLUG_FABRICS,
+            $downloadedFilename,
+            $generateImageVariants,
+        );
+    }
+
+    /**
+     * Fallback: одиночная загрузка с Google Drive confirm retry (после неудачи batch).
+     */
+    public function importFabricTextureWithRetry(
+        string $url,
+        string $collectionSlug,
+        string $designCode,
+        bool $generateImageVariants = true,
+    ): ?MediaFile {
+        $downloadUrl = CloudStorageUrlResolver::resolve($url) ?? $url;
+        $extension = FabricMediaNaming::extensionFromUrl($downloadUrl);
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+        $kind = in_array($extension, $imageExtensions, true)
+            ? MediaFile::KIND_IMAGE
+            : MediaFile::KIND_DOCUMENT;
+
+        [$tempPath, $downloadedFilename] = $this->downloadToTempFile($downloadUrl, $kind, true);
+
+        try {
+            return $this->importFromTempPath(
+                $tempPath,
+                $downloadUrl,
+                FabricMediaNaming::swatch($collectionSlug, $designCode, $extension),
+                $kind,
+                MediaFolder::SLUG_FABRICS,
+                $downloadedFilename,
+                $generateImageVariants,
+            );
+        } finally {
+            if (is_file($tempPath)) {
+                @unlink($tempPath);
+            }
+        }
+    }
+
+    public function resolveFabricTextureKind(string $url): string
+    {
+        $extension = FabricMediaNaming::extensionFromUrl($url);
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'];
+
+        return in_array($extension, $imageExtensions, true)
+            ? MediaFile::KIND_IMAGE
+            : MediaFile::KIND_DOCUMENT;
+    }
+
+    private function importFromTempPath(
+        string $tempPath,
+        string $sourceUrl,
+        string $preferredBasename,
+        string $kind,
+        string $folderSlug,
+        ?string $downloadedFilename,
+        bool $generateImageVariants = true,
+    ): MediaFile {
+        $storageBasename = MediaContentValidator::guessStorageBasename(
+            $tempPath,
+            $preferredBasename,
+            $downloadedFilename
+        );
+        $originalFilename = $downloadedFilename !== null && trim($downloadedFilename) !== ''
+            ? MediaContentValidator::normalizeFilename(trim($downloadedFilename))
+            : $storageBasename;
+
+        return $this->storage->importFromPath(
+            $tempPath,
+            $storageBasename,
+            $kind,
+            $folderSlug,
+            $originalFilename,
+            null,
+            $generateImageVariants,
+        );
     }
 
     /**
@@ -213,23 +305,8 @@ class MediaImportService
             throw new \RuntimeException('Не удалось инициализировать загрузку URL.');
         }
 
-        $contentDisposition = null;
-        curl_setopt_array($ch, [
-            CURLOPT_FILE => $handle,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 5,
-            CURLOPT_CONNECTTIMEOUT => 20,
-            CURLOPT_TIMEOUT => 120,
-            CURLOPT_USERAGENT => 'FabricRegistryImporter/1.0',
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_HEADERFUNCTION => static function ($curl, string $headerLine) use (&$contentDisposition): int {
-                if (stripos($headerLine, 'Content-Disposition:') === 0) {
-                    $contentDisposition = trim(substr($headerLine, strlen('Content-Disposition:')));
-                }
-
-                return strlen($headerLine);
-            },
-        ]);
+        $dispositionHolder = new \stdClass();
+        FabricMediaCurlFactory::applyDownloadOptions($ch, $handle, $dispositionHolder);
 
         $success = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -266,6 +343,8 @@ class MediaImportService
             @unlink($tempPath);
             throw new \RuntimeException('По ссылке получен не PDF/ZIP (возможно, HTML-страница облачного хранилища).');
         }
+
+        $contentDisposition = isset($dispositionHolder->value) ? (string)$dispositionHolder->value : null;
 
         return [
             $tempPath,

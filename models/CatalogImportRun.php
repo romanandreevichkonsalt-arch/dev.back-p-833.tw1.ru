@@ -130,8 +130,13 @@ class CatalogImportRun extends ActiveRecord
         $this->options_json = json_encode($options, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
-    public function markProgress(int $processed, int $total, string $phase, string $message): void
-    {
+    public function markProgress(
+        int $processed,
+        int $total,
+        string $phase,
+        string $message,
+        bool $autoComplete = true,
+    ): void {
         $this->processed_rows = max(0, $processed);
         $this->total_rows = max(0, $total);
         $this->phase = $phase;
@@ -139,7 +144,7 @@ class CatalogImportRun extends ActiveRecord
         if ($this->status === self::STATUS_QUEUED) {
             $this->status = self::STATUS_PROCESSING;
         }
-        if ($total > 0 && $processed >= $total && !$this->isTerminal()) {
+        if ($autoComplete && $total > 0 && $processed >= $total && !$this->isTerminal()) {
             $this->status = self::STATUS_COMPLETED;
             $this->phase = self::PHASE_DONE;
             $this->phase_message = sprintf('Обработано %d строк из %d', $total, $total);
@@ -168,5 +173,30 @@ class CatalogImportRun extends ActiveRecord
     {
         return $this->hasMany(CatalogImportMediaQueue::class, ['import_run_id' => 'id'])
             ->orderBy(['row_number' => SORT_ASC, 'id' => SORT_ASC]);
+    }
+
+    public function supportsMediaProgress(): bool
+    {
+        return $this->hasAttribute('media_total') && $this->hasAttribute('media_processed_rows');
+    }
+
+    public function getMediaTotal(): int
+    {
+        return $this->supportsMediaProgress() ? (int)$this->media_total : 0;
+    }
+
+    public function getMediaProcessedRows(): int
+    {
+        return $this->supportsMediaProgress() ? (int)$this->media_processed_rows : 0;
+    }
+
+    public function setMediaProgress(int $processed, int $total): void
+    {
+        if (!$this->supportsMediaProgress()) {
+            return;
+        }
+
+        $this->media_processed_rows = max(0, $processed);
+        $this->media_total = max(0, $total);
     }
 }

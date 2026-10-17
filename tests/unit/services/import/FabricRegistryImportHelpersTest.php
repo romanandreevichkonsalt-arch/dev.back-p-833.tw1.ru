@@ -2,10 +2,13 @@
 
 namespace tests\unit\services\import;
 
+use app\models\CatalogFabricColor;
 use app\services\import\fabric\CloudStorageUrlResolver;
 use app\services\import\fabric\FabricColorNameValidator;
 use app\services\import\fabric\FabricDesignCodeNormalizer;
+use app\services\import\fabric\FabricImportPhotoSkipEvaluator;
 use app\services\import\fabric\FabricMediaNaming;
+use app\services\import\fabric\FabricRegistryRowDto;
 use app\services\import\fabric\MediaUrlClassifier;
 use app\services\import\fabric\PriceCategoryLabelParser;
 use Codeception\Test\Unit;
@@ -108,5 +111,59 @@ class FabricRegistryImportHelpersTest extends Unit
         verify($resolved)->notNull();
         verify($resolved)->stringContainsString('gucci');
         verify($resolved)->stringContainsString('.jpg');
+    }
+
+    public function testPhotoSkipWhenSourceUrlUnchanged(): void
+    {
+        $url = 'https://example.com/swatch.jpg';
+        $link = new CatalogFabricColor([
+            'swatch_media_id' => 10,
+            'source_photo_url' => $url,
+            'import_media_pending' => false,
+        ]);
+        $row = $this->fabricRowWithTextureUrl($url);
+
+        verify(FabricImportPhotoSkipEvaluator::skipReason($link, $row, $url))->notNull();
+
+        $link->source_photo_url = $url . '?mt=123';
+        verify(FabricImportPhotoSkipEvaluator::skipReason($link, $row, $url))->notNull();
+
+        verify(FabricImportPhotoSkipEvaluator::skipReason($link, $this->fabricRowWithTextureUrl($url . '2'), $url))->null();
+    }
+
+    public function testPhotoSkipRequiresExistingMedia(): void
+    {
+        $url = 'https://example.com/swatch.jpg';
+        $link = new CatalogFabricColor([
+            'swatch_media_id' => 0,
+            'source_photo_url' => $url,
+        ]);
+        $row = $this->fabricRowWithTextureUrl($url);
+
+        verify(FabricImportPhotoSkipEvaluator::skipReason($link, $row, $url))->null();
+    }
+
+    private function fabricRowWithTextureUrl(?string $textureUrl): FabricRegistryRowDto
+    {
+        return new FabricRegistryRowDto(
+            5,
+            'fabric',
+            'Collection',
+            'Color',
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $textureUrl,
+            false,
+            null,
+            null,
+            null,
+        );
     }
 }

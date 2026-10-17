@@ -82,6 +82,15 @@ class SimpleXlsxSheetReader
      */
     public function readAllSheetsGrids(string $filePath): array
     {
+        return $this->readSheetsGrids($filePath, []);
+    }
+
+    /**
+     * @param list<string> $onlySheetNames пустой список — все листы
+     * @return array<string, array<int, array<string, string>>> normalized sheet name => grid
+     */
+    public function readSheetsGrids(string $filePath, array $onlySheetNames = []): array
+    {
         self::assertZipXlsx($filePath);
 
         $zip = new ZipArchive();
@@ -95,10 +104,18 @@ class SimpleXlsxSheetReader
                 return [];
             }
 
+            $filter = [];
+            foreach ($onlySheetNames as $name) {
+                $filter[SpreadsheetSheetResolver::normalizeName($name)] = true;
+            }
+
             $sharedStrings = $this->readSharedStrings($zip);
             $grids = [];
             foreach ($entries as $entry) {
                 $normalized = SpreadsheetSheetResolver::normalizeName($entry['name']);
+                if ($filter !== [] && !isset($filter[$normalized])) {
+                    continue;
+                }
                 $grids[$normalized] = $this->readSheetGrid($zip, $entry['path'], $sharedStrings);
             }
 

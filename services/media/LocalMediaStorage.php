@@ -81,7 +81,8 @@ class LocalMediaStorage
         string $kind = MediaFile::KIND_IMAGE,
         ?string $folderSlug = null,
         ?string $preferredBasename = null,
-        ?string $alt = null
+        ?string $alt = null,
+        bool $generateImageVariants = true,
     ): MediaFile {
         if (!is_file($sourcePath)) {
             throw new \RuntimeException('Файл не найден: ' . $sourcePath);
@@ -118,17 +119,21 @@ class LocalMediaStorage
 
         $mime = mime_content_type($fullPath) ?: 'application/octet-stream';
         $dimensions = $this->readImageDimensions($fullPath, $mime);
-        [$pathLarge, $pathMedium, $pathMini] = $this->generateVariantPaths($fullPath, $basename, $subdir, $kind);
+        [$pathLarge, $pathMedium, $pathMini] = $generateImageVariants
+            ? $this->generateVariantPaths($fullPath, $basename, $subdir, $kind)
+            : [null, null, null];
 
-        if ($existing !== null) {
+        if ($existing !== null && $generateImageVariants) {
             $this->unlinkPaths([$existing->path_large, $existing->path_medium, $existing->path_mini]);
         }
 
         if ($existing !== null) {
             $existing->filename = $originalFilename !== '' ? $originalFilename : $basename;
-            $existing->path_large = $pathLarge;
-            $existing->path_medium = $pathMedium;
-            $existing->path_mini = $pathMini;
+            if ($generateImageVariants) {
+                $existing->path_large = $pathLarge;
+                $existing->path_medium = $pathMedium;
+                $existing->path_mini = $pathMini;
+            }
             $existing->kind = $kind;
             $existing->folder_id = $folder->id;
             $existing->mime = $mime;
