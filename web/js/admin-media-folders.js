@@ -40,6 +40,10 @@
             button.textContent = folder.label;
             button.addEventListener('click', function () {
                 onSelect(folder);
+                container.querySelectorAll('.admin-page-tabs__link').forEach(function (tab) {
+                    tab.classList.remove('admin-page-tabs__link--active');
+                });
+                button.classList.add('admin-page-tabs__link--active');
             });
             container.appendChild(button);
         });

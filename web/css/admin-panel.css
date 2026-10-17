@@ -48,6 +48,9 @@ a {
     display: flex;
     flex-direction: column;
     gap: 32px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
 }
 
 .admin-brand {
