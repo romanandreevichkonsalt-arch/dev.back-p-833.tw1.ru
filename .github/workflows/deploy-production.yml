@@ -1,0 +1,66 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Deploy mode'
+        required: true
+        default: app
+        type: choice
+        options:
+          - files
+          - app
+          - full
+
+concurrency:
+  group: deploy-production-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  SSH_HOST: 161.104.62.214
+  SSH_USER: api_mf_anna__usr
+  SITE_DOMAIN: api.mf-anna.ru
+  DEPLOY_BASE: /var/www/api_mf_anna__usr/data
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY_PRODUCTION: ${{ secrets.SSH_PRIVATE_KEY_PRODUCTION }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          KEY="${SSH_PRIVATE_KEY_PRODUCTION:-$SSH_PRIVATE_KEY}"
+          if [ -z "$KEY" ]; then
+            echo "::error::Set GitHub secret SSH_PRIVATE_KEY_PRODUCTION or SSH_PRIVATE_KEY."
+            exit 1
+          fi
+          SSH_PRIVATE_KEY="$KEY"
+          mkdir -p ~/.ssh
+          KEY_FILE=~/.ssh/deploy_key
+          if echo "$SSH_PRIVATE_KEY" | grep -q 'BEGIN'; then
+            printf '%s' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            echo "$SSH_PRIVATE_KEY" | tr -d '\n\r ' | base64 -d > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy
+        env:
+          CONFIRM: "1"
+          SKIP_BRANCH_CHECK: "1"
+        run: |
+          export SSH_IDENTITY_FILE=~/.ssh/deploy_key
+          ./deploy/deploy-production.sh "${{ inputs.mode }}"
+
+      - name: Smoke check
+        run: |
+          curl -sfI "https://api.mf-anna.ru/api/v1/catalog/menu" | head -5

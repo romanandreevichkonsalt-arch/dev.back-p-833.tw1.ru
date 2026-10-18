@@ -1,6 +1,6 @@
 # Деплой back-dev — инструкция для агента
 
-> **fabrica-beget по умолчанию:** [AGENT-DEPLOY-PROD.md](./AGENT-DEPLOY-PROD.md) → **https://api.dev-fabrika.ru** (`./deploy/deploy-prod.sh`).
+> **fabrica-beget:** staging [AGENT-DEPLOY-STAGING.md](./AGENT-DEPLOY-STAGING.md) · production [AGENT-DEPLOY-PRODUCTION.md](./AGENT-DEPLOY-PRODUCTION.md).
 
 Dev: **https://dev.back-p-833.tw1.ru**  
 SSH: `dev_back_p_8_usr@200.165.224.88` (тот же IP, что у `dev.back-p-833.tw1.ru`).
@@ -93,4 +93,4 @@ SITE_DOMAIN=dev.back-p-833.tw1.ru
 
 ## GitHub Actions
 
-`.github/workflows/deploy-prod.yml` — деплой с ключом в CI, режим **full** (отдельно от локального ASKPASS).
+CI: `.github/workflows/deploy-staging.yml` (push `develop`), `.github/workflows/deploy-production.yml` (manual, `main`).

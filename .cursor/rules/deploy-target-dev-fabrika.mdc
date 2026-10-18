@@ -1,15 +1,22 @@
 ---
-description: Default deploy target for fabrica-beget (api.dev-fabrika.ru)
+description: Default deploy target for fabrica-beget (staging vs production)
 alwaysApply: true
 ---
 
-# Деплой по умолчанию (fabrica-beget)
+# Деплой (fabrica-beget)
 
-Из **этого репозитория** деплой на dev/staging API всегда на **https://api.dev-fabrika.ru**, не на dev.back-p-833.tw1.ru.
+**По умолчанию для агента — только staging**, не production.
 
-- Скрипт: `./deploy/deploy-prod.sh` (`files` | `app` | `full`), не `./deploy/deploy.sh` без prod-обёртки.
-- SSH: `api_dev_fabr_usr@161.104.62.214`, ключ `~/.ssh/id_ed25519` (см. `deploy/AGENT-DEPLOY-PROD.md`).
-- Проверка после выкладки: `curl -sI "https://api.dev-fabrika.ru/api/v1/catalog/menu" | head -5`
+| Среда | API | Ветка | Команда |
+|-------|-----|-------|---------|
+| Staging | https://api.dev-fabrika.ru | `develop` | `./deploy/deploy-staging.sh` (`files` \| `app` \| `full`) |
+| Production | https://api.mf-anna.ru | `main` | `CONFIRM=1 ./deploy/deploy-production.sh` — **только по явному запросу** |
+
+- Staging SSH: `api_dev_fabr_usr@161.104.62.214`, ключ `~/.ssh/id_ed25519`
+- Production SSH: `api_mf_anna__usr@161.104.62.214`
+- Документация: `deploy/AGENT-DEPLOY-STAGING.md`, `deploy/AGENT-DEPLOY-PRODUCTION.md`
 - Skill: `.cursor/skills/back-dev-deploy/SKILL.md`
+- Не использовать legacy `dev.back-p-833.tw1.ru` без явной просьбы
+- `./deploy/deploy-prod.sh` — устаревший алиас на staging
 
 Push/commit — только по запросу пользователя.

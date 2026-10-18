@@ -1,50 +1,54 @@
 ---
 name: back-dev-deploy
 description: >-
-  Deploy this repo to https://api.dev-fabrika.ru via deploy-prod.sh (files/app/full).
-  Use when the user asks to deploy, push to dev, rsync, or update the server.
-  Prefer mode files for PHP-only changes; app when migrations; full when OpenAPI changed.
+  Deploy fabrica-beget: staging (develop → api.dev-fabrika.ru) or production
+  (main → api.mf-anna.ru). Use deploy-staging.sh by default; production only with CONFIRM=1.
 ---
 
-# Деплой api.dev-fabrika.ru (по умолчанию для fabrica-beget)
+# Деплой API (fabrica-beget)
 
-**Полная инструкция:** [deploy/AGENT-DEPLOY-PROD.md](../../../deploy/AGENT-DEPLOY-PROD.md)
+| Среда | URL | Ветка | Скрипт |
+|-------|-----|-------|--------|
+| Staging | https://api.dev-fabrika.ru | `develop` | `./deploy/deploy-staging.sh` |
+| Production | https://api.mf-anna.ru | `main` | `CONFIRM=1 ./deploy/deploy-production.sh` |
 
-Цель: **https://api.dev-fabrika.ru** · SSH: `api_dev_fabr_usr@161.104.62.214`
+**Staging:** [deploy/AGENT-DEPLOY-STAGING.md](../../../deploy/AGENT-DEPLOY-STAGING.md)  
+**Production:** [deploy/AGENT-DEPLOY-PRODUCTION.md](../../../deploy/AGENT-DEPLOY-PRODUCTION.md)  
+**Перенос данных:** [deploy/MIGRATE-STAGING-TO-PRODUCTION.md](../../../deploy/MIGRATE-STAGING-TO-PRODUCTION.md)
 
-Старый хост `dev.back-p-833.tw1.ru` — только если пользователь явно попросит; иначе **не использовать**.
+По умолчанию для агента — **только staging**, не production.
 
-## Команда
+## Staging (default)
 
 ```bash
-cd /path/to/fabrica-beget
-./deploy/deploy-prod.sh files   # | app | full
+git checkout develop
+./deploy/deploy-staging.sh files   # | app | full
 ```
 
-`deploy-prod.sh` выставляет `SSH_HOST`, `SSH_USER`, `SITE_DOMAIN` и вызывает `deploy/deploy.sh`.
+SSH: `api_dev_fabr_usr@161.104.62.214`, ключ `~/.ssh/id_ed25519`.
 
-SSH-ключ: по умолчанию `~/.ssh/id_ed25519` (см. prod-док). BatchMode `Permission denied` → ключ не добавлен у `api_dev_fabr_usr` в FastPanel.
+## Production (explicit only)
 
-Shell: `required_permissions: ["all"]`.
+```bash
+git checkout main
+CONFIRM=1 ./deploy/deploy-production.sh app
+```
 
-Rsync timeout → **повторить** деплой один раз.
+SSH: `api_mf_anna__usr@161.104.62.214`.
 
 ## Режимы
 
 | Режим | Когда |
 |-------|--------|
-| **files** | Код без миграций и OpenAPI (default) |
+| **files** | Код без миграций и OpenAPI |
 | **app** | `migrations/`, `composer.lock` |
-| **full** | `docs/OpenApiSpec.php`, `@OA` в API controllers |
+| **full** | OpenAPI / `@OA` |
 
 ## После деплоя
 
 ```bash
 curl -sI "https://api.dev-fabrika.ru/api/v1/catalog/menu" | head -5
+curl -sI "https://api.mf-anna.ru/api/v1/catalog/menu" | head -5
 ```
 
-## Прочее
-
-- Пути на сервере: [reference.md](reference.md)
-- Legacy dev.back-p-833: [deploy/AGENT-DEPLOY.md](../../../deploy/AGENT-DEPLOY.md)
-- Commit/push — только по запросу пользователя
+Shell: `required_permissions: ["all"]`. Commit/push — только по запросу пользователя.

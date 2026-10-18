@@ -2,7 +2,7 @@
 # Импорт SQL на prod через SSH. Локально из корня репозитория:
 #   ./deploy/import-db-remote.sh /path/to/dump.sql
 #
-# Переменные как у deploy-prod.sh; на сервере читается app/.env (DB_*).
+# Переменные как у deploy-staging.sh / deploy-production.sh; на сервере читается app/.env (DB_*).
 set -euo pipefail
 
 DUMP="${1:?Usage: import-db-remote.sh /path/to/dump.sql}"

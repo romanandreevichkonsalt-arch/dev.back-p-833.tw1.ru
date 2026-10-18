@@ -58,9 +58,17 @@ foreach (file($envFile, FILE_IGNORE_NEW_LINES) as $line) {
     if ($pos === false) continue;
     $vars[substr($line, 0, $pos)] = substr($line, $pos + 1);
 }
-$dsn = $vars["DB_DSN"] ?? "";
-$user = $vars["DB_USER"] ?? "";
-$pass = $vars["DB_PASSWORD"] ?? "";
+$strip = static function (string $v): string {
+    $v = trim($v);
+    $sq = chr(39);
+    if ((str_starts_with($v, "\"") && str_ends_with($v, "\"")) || (str_starts_with($v, $sq) && str_ends_with($v, $sq))) {
+        return substr($v, 1, -1);
+    }
+    return $v;
+};
+$dsn = $strip($vars["DB_DSN"] ?? "");
+$user = $strip($vars["DB_USER"] ?? "");
+$pass = $strip($vars["DB_PASSWORD"] ?? "");
 if ($dsn === "" || $user === "") exit(0);
 $cfg = "<?php\n\nreturn [\n    '\''class'\'' => '\''yii\\\\db\\\\Connection'\'',\n    '\''dsn'\'' => '\''" . addslashes($dsn) . "'\'',\n    '\''username'\'' => '\''" . addslashes($user) . "'\'',\n    '\''password'\'' => '\''" . addslashes($pass) . "'\'',\n    '\''charset'\'' => '\''utf8mb4'\'',\n];\n";
 file_put_contents($out, $cfg);

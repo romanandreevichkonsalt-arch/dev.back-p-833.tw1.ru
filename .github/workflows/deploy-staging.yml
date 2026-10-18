@@ -1,0 +1,62 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [develop]
+    paths-ignore:
+      - '.github/workflows/bootstrap-local-access.yml'
+      - '.github/workflows/deploy-production.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging-${{ github.repository }}
+  cancel-in-progress: true
+
+env:
+  SSH_HOST: 161.104.62.214
+  SSH_USER: api_dev_fabr_usr
+  SITE_DOMAIN: api.dev-fabrika.ru
+  DEPLOY_BASE: /var/www/api_dev_fabr_usr/data
+  DEPLOY_MODE: app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY_STAGING: ${{ secrets.SSH_PRIVATE_KEY_STAGING }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          KEY="${SSH_PRIVATE_KEY_STAGING:-$SSH_PRIVATE_KEY}"
+          if [ -z "$KEY" ]; then
+            echo "::error::Set GitHub secret SSH_PRIVATE_KEY_STAGING or SSH_PRIVATE_KEY (staging deploy key)."
+            exit 1
+          fi
+          SSH_PRIVATE_KEY="$KEY"
+          mkdir -p ~/.ssh
+          KEY_FILE=~/.ssh/deploy_key
+          if echo "$SSH_PRIVATE_KEY" | grep -q 'BEGIN'; then
+            printf '%s' "$SSH_PRIVATE_KEY" > "$KEY_FILE"
+          else
+            echo "$SSH_PRIVATE_KEY" | tr -d '\n\r ' | base64 -d > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+          if ! ssh-keygen -y -f "$KEY_FILE" > /dev/null 2>&1; then
+            echo "::error::SSH private key is invalid."
+            exit 1
+          fi
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy
+        run: |
+          export SSH_IDENTITY_FILE=~/.ssh/deploy_key
+          ./deploy/deploy-staging.sh "${DEPLOY_MODE}"
+
+      - name: Smoke check
+        run: |
+          curl -sfI "https://api.dev-fabrika.ru/api/v1/catalog/menu" | head -5

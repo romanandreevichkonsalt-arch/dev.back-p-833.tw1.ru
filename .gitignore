@@ -44,6 +44,7 @@ config/db.php
 # локальный SSH-пароль для ./deploy/deploy.sh (см. deploy/.ssh-askpass.sh.example)
 /deploy/.ssh-askpass.sh
 /deploy/.ssh-askpass-prod.sh
+/deploy/.ssh-askpass-mf-anna.sh
 /deploy/.prod-paste-command.sh
 .env.prod.local
 docker-compose.local.yml

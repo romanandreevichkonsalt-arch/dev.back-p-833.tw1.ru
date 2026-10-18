@@ -1,6 +1,7 @@
 <?php
 
-$receiptDestinationEmail = trim(getenv('YOOKASSA_RECEIPT_EMAIL') ?: 'tania22gerasimenko@gmail.com');
+// Пусто = чек на email из заказа; guest+phone@domain только если почты нет. Ненулевое значение — все чеки на один адрес (dev/отладка).
+$receiptDestinationEmail = trim((string)(getenv('YOOKASSA_RECEIPT_EMAIL') ?: ''));
 
 $corsOrigins = [
     'http://localhost:3000',
@@ -10,6 +11,8 @@ $corsOrigins = [
     'https://dev.front-p-833.tw1.ru',
     'https://dev-fabrika.ru',
     'https://www.dev-fabrika.ru',
+    'https://mf-anna.ru',
+    'https://www.mf-anna.ru',
 ];
 
 $appendCorsOrigin = static function (string $url) use (&$corsOrigins): void {
@@ -20,7 +23,11 @@ $appendCorsOrigin = static function (string $url) use (&$corsOrigins): void {
     $corsOrigins[] = rtrim($url, '/');
 };
 
-$appendCorsOrigin(getenv('FRONTEND_URL') ?: '');
+$frontendUrl = rtrim(trim(getenv('FRONTEND_URL') ?: ''), '/');
+$appendCorsOrigin($frontendUrl);
+if ($frontendUrl !== '' && preg_match('#^https://(?!www\.)([^/]+)$#', $frontendUrl)) {
+    $appendCorsOrigin('https://www.' . preg_replace('#^https://#', '', $frontendUrl));
+}
 
 $corsExtra = trim(getenv('CORS_ORIGINS') ?: '');
 if ($corsExtra !== '') {
