@@ -33,6 +33,9 @@ abstract class ApiController extends Controller
             ],
         ];
 
+        // CORS must run before authenticator; otherwise 401/403 responses lack Allow-Origin.
+        unset($behaviors['authenticator']);
+
         $origins = \Yii::$app->params['corsOrigins'] ?? ['*'];
 
         $behaviors['corsFilter'] = [
