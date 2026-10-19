@@ -34,7 +34,7 @@ rsync -a --delete \
     --exclude='config/db.php' \
     --exclude='runtime/**' \
     --exclude='web/assets/**' \
-    --exclude='web/uploads/**' \
+    --exclude='web/uploads' \
     --exclude='vendor/' \
     "${REPO_DIR}/" "${APP_ROOT}/"
 
@@ -101,8 +101,23 @@ if [ -d "${APP_ROOT}/web" ]; then
     fi
 fi
 
-mkdir -p "${APP_ROOT}/runtime" "${APP_ROOT}/web/assets" "${APP_ROOT}/web/uploads"
+mkdir -p "${APP_ROOT}/runtime" "${APP_ROOT}/web/assets"
 chmod -R 775 "${APP_ROOT}/runtime" "${APP_ROOT}/web/assets" 2>/dev/null || true
+
+SHARED_UPLOADS="/var/www/shared-fabrica/uploads"
+UPLOADS_DIR="${APP_ROOT}/web/uploads"
+if [ -d "${SHARED_UPLOADS}" ]; then
+    if [ -e "${UPLOADS_DIR}" ] && [ ! -L "${UPLOADS_DIR}" ]; then
+        if [ -d "${UPLOADS_DIR}" ] && [ -z "$(ls -A "${UPLOADS_DIR}" 2>/dev/null)" ]; then
+            rm -rf "${UPLOADS_DIR}"
+        fi
+    fi
+    if [ ! -e "${UPLOADS_DIR}" ]; then
+        ln -sfn "${SHARED_UPLOADS}" "${UPLOADS_DIR}"
+    fi
+else
+    mkdir -p "${UPLOADS_DIR}"
+fi
 
 cd "$APP_ROOT"
 
