@@ -333,7 +333,8 @@ use OpenApi\Annotations as OA;
  *     schema="ProfileSubscriptionRequest",
  *     type="object",
  *     required={"subscription"},
- *     @OA\Property(property="subscription", type="boolean", example=true, description="true — подписаться, false — отписаться")
+ *     @OA\Property(property="subscription", type="boolean", example=true, description="true — подписаться, false — отписаться"),
+ *     @OA\Property(property="email", type="string", format="email", example="guest@example.com", description="Обязателен без Bearer: подписка/отписка по почте; пользователь создаётся, если записи с этим email нет")
  * )
  *
  * @OA\Schema(

@@ -5,6 +5,7 @@ namespace app\controllers\api\v1;
 use app\exceptions\ApiValidationException;
 use app\models\User;
 use app\models\UserProfile;
+use app\services\profile\EmailSubscriptionService;
 use app\services\profile\UserSubscriptionService;
 use OpenApi\Annotations as OA;
 use Yii;
@@ -15,7 +16,7 @@ class ProfileController extends ApiController
     public function behaviors(): array
     {
         $behaviors = parent::behaviors();
-        unset($behaviors['authenticator']['except']);
+        $behaviors['authenticator']['except'] = ['subscription', 'options'];
 
         return $behaviors;
     }
@@ -77,8 +78,8 @@ class ProfileController extends ApiController
      *     path="/api/v1/profile/subscription",
      *     tags={"Профиль"},
      *     summary="Подписка на персональные предложения и новости",
-     *     description="Единое поле subscription для розничного пользователя и дилера. true — подписан, false — отписан.",
-     *     security={{"bearerAuth":{}}},
+     *     description="С Bearer — подписка текущего пользователя. Без авторизации — укажите email: создаётся розничный пользователь только с почтой (если ещё нет) и включается subscription.",
+     *     security={},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(ref="#/components/schemas/ProfileSubscriptionRequest")
@@ -89,16 +90,11 @@ class ProfileController extends ApiController
      *         @OA\JsonContent(ref="#/components/schemas/ProfileSubscriptionResponse")
      *     ),
      *     @OA\Response(response=400, description="Ошибка валидации", @OA\JsonContent(ref="#/components/schemas/ApiValidationError")),
-     *     @OA\Response(response=401, description="Не авторизован")
+     *     @OA\Response(response=401, description="Не используется для гостевой подписки по email")
      * )
      */
     public function actionSubscription(): array
     {
-        $identity = Yii::$app->user->identity;
-        if ($identity === null) {
-            throw new UnauthorizedHttpException('Bearer token is required.');
-        }
-
         $body = Yii::$app->request->getBodyParams();
         if (!array_key_exists('subscription', $body)) {
             throw new ApiValidationException('Укажите subscription: true или false.', [
@@ -106,12 +102,24 @@ class ProfileController extends ApiController
             ]);
         }
 
-        $user = User::findOne((int)$identity->getId());
-        if ($user === null) {
-            throw new UnauthorizedHttpException('Bearer token is required.');
+        $user = $this->resolveOptionalUser();
+        if ($user !== null) {
+            $fresh = User::findOne((int)$user->getId());
+            if ($fresh === null) {
+                throw new UnauthorizedHttpException('Bearer token is required.');
+            }
+
+            return (new UserSubscriptionService())->update($fresh, $body['subscription']);
         }
 
-        return (new UserSubscriptionService())->update($user, $body['subscription']);
+        $email = trim((string)($body['email'] ?? ''));
+        if ($email === '') {
+            throw new ApiValidationException('Укажите email для подписки без входа в аккаунт.', [
+                'email' => ['Поле обязательно без Bearer-токена.'],
+            ]);
+        }
+
+        return (new EmailSubscriptionService())->applyForEmail($email, $body['subscription']);
     }
 
     public function verbs(): array
