@@ -2,7 +2,6 @@
 
 namespace app\services\guest;
 
-use app\models\GuestSession;
 use Yii;
 use yii\web\BadRequestHttpException;
 
@@ -15,16 +14,18 @@ class GuestSessionService
             return;
         }
 
-        $model = GuestSession::findOne(['session_id' => $sessionId]);
-        if ($model === null) {
-            $model = new GuestSession();
-            $model->session_id = $sessionId;
-            $model->save(false);
-            return;
-        }
-
-        $model->updated_at = date('Y-m-d H:i:s');
-        $model->save(false, ['updated_at']);
+        $now = date('Y-m-d H:i:s');
+        Yii::$app->db->createCommand(
+            'INSERT INTO {{%guest_sessions}} ([[session_id]], [[created_at]], [[updated_at]])'
+            . ' VALUES (:sessionId, :createdAt, :updatedAt)'
+            . ' ON DUPLICATE KEY UPDATE [[updated_at]] = :touchAt',
+            [
+                ':sessionId' => $sessionId,
+                ':createdAt' => $now,
+                ':updatedAt' => $now,
+                ':touchAt' => $now,
+            ],
+        )->execute();
     }
 
     /**
