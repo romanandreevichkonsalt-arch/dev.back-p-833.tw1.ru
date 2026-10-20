@@ -17,6 +17,36 @@ class DealerForm extends Model
     public bool $send_email = true;
     public string $dealer_type = DealerProfile::TYPE_NEW;
 
+    public function load($data, $formName = null): bool
+    {
+        if ($formName === null) {
+            $formName = $this->formName();
+        }
+
+        if ($formName === '') {
+            $this->normalizeRequestAttributes($data);
+        } elseif (isset($data[$formName]) && is_array($data[$formName])) {
+            $this->normalizeRequestAttributes($data[$formName]);
+        }
+
+        return parent::load($data, $formName);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function normalizeRequestAttributes(array &$row): void
+    {
+        if (array_key_exists('assigned_manager_id', $row)) {
+            $value = $row['assigned_manager_id'];
+            $row['assigned_manager_id'] = ($value === '' || $value === null) ? null : (int)$value;
+        }
+
+        if (array_key_exists('send_email', $row)) {
+            $row['send_email'] = filter_var($row['send_email'], FILTER_VALIDATE_BOOLEAN);
+        }
+    }
+
     public function rules(): array
     {
         return [
