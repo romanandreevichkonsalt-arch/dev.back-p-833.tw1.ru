@@ -2,6 +2,7 @@
 
 namespace app\services\payment;
 
+use app\helpers\PublicSiteUrl;
 use app\models\Order;
 use app\services\cart\CartService;
 use app\services\guest\ApiOwnerContext;
@@ -322,7 +323,10 @@ class YooKassaPaymentService
         $base = trim((string)(Yii::$app->params['yookassa']['returnUrl'] ?? ''));
         if ($base === '') {
             $frontend = rtrim(trim((string)(Yii::$app->params['frontendUrl'] ?? '')), '/');
-            $base = ($frontend !== '' ? $frontend : 'https://dev.front-p-833.tw1.ru') . '/cart?fromPayment=1';
+            if ($frontend === '') {
+                $frontend = PublicSiteUrl::DEFAULT_FRONTEND;
+            }
+            $base = $frontend . '/cart?fromPayment=1';
         }
 
         $separator = str_contains($base, '?') ? '&' : '?';
@@ -548,7 +552,7 @@ class YooKassaPaymentService
     private function fallbackReceiptEmail(Order $order): ?string
     {
         $params = Yii::$app->params['yookassa'] ?? [];
-        $domain = trim((string)($params['receiptFallbackEmailDomain'] ?? 'noreply.dev.front-p-833.tw1.ru'));
+        $domain = trim((string)($params['receiptFallbackEmailDomain'] ?? 'noreply.dev-fabrika.ru'));
         if ($domain === '') {
             return null;
         }

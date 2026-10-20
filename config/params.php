@@ -1,5 +1,9 @@
 <?php
 
+require_once __DIR__ . '/../helpers/PublicSiteUrl.php';
+
+use app\helpers\PublicSiteUrl;
+
 // Пусто = чек на email из заказа; guest+phone@domain только если почты нет. Ненулевое значение — все чеки на один адрес (dev/отладка).
 $receiptDestinationEmail = trim((string)(getenv('YOOKASSA_RECEIPT_EMAIL') ?: ''));
 
@@ -38,6 +42,9 @@ if ($corsExtra !== '') {
 
 $corsOrigins = array_values(array_unique($corsOrigins));
 
+$resolvedFrontendUrl = PublicSiteUrl::frontendUrl();
+$dealerCabinetUrl = PublicSiteUrl::dealerCabinetUrl();
+
 return [
     'adminEmail' => 'admin@example.com',
     'senderEmail' => 'noreply@example.com',
@@ -61,7 +68,7 @@ return [
         'receiptInternet' => filter_var(getenv('YOOKASSA_RECEIPT_INTERNET') ?: '1', FILTER_VALIDATE_BOOLEAN),
         'receiptTimezone' => (int)(getenv('YOOKASSA_RECEIPT_TIMEZONE') ?: 3),
         // Если в форме нет email — чек ЮKassa на guest+{phone}@этот-домен (см. docs/yookassa-testing.md)
-        'receiptFallbackEmailDomain' => getenv('YOOKASSA_RECEIPT_FALLBACK_EMAIL_DOMAIN') ?: 'noreply.dev.front-p-833.tw1.ru',
+        'receiptFallbackEmailDomain' => getenv('YOOKASSA_RECEIPT_FALLBACK_EMAIL_DOMAIN') ?: 'noreply.dev-fabrika.ru',
         // Optional: X-Yookassa-Test-Token for POST/GET .../payments/yookassa/test/*
         'testApiToken' => getenv('YOOKASSA_TEST_API_TOKEN') ?: '',
         // https://yookassa.ru/developers/using-api/webhooks#security
@@ -77,8 +84,8 @@ return [
     ],
     // Неоплаченные guest-заказы: cron `php yii order/cancel-unpaid`
     'orderUnpaidCancelHours' => 24,
-    'dealerCabinetUrl' => 'https://dev.back-p-833.tw1.ru/dealer',
-    'frontendUrl' => getenv('FRONTEND_URL') ?: 'https://dev.front-p-833.tw1.ru',
+    'dealerCabinetUrl' => $dealerCabinetUrl,
+    'frontendUrl' => $resolvedFrontendUrl,
     'moodboardSharePathPrefix' => '/moodboard/public/',
     'orderAttachmentStoragePath' => '@runtime/order-attachments',
     'leadAttachmentStoragePath' => '@runtime/lead-attachments',
