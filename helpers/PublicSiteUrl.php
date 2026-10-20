@@ -6,6 +6,9 @@ final class PublicSiteUrl
 {
     public const DEFAULT_FRONTEND = 'https://dev-fabrika.ru';
 
+    /** Query on the public site that opens dealer login (ЛК дилера). */
+    public const DEALER_CABINET_ENTRY = '/?login=true';
+
     public static function frontendUrl(?string $envValue = null): string
     {
         if ($envValue === null) {
@@ -28,6 +31,6 @@ final class PublicSiteUrl
             return $override;
         }
 
-        return self::frontendUrl($envFrontend);
+        return self::frontendUrl($envFrontend) . self::DEALER_CABINET_ENTRY;
     }
 }

@@ -10,7 +10,7 @@ class PublicSiteUrlTest extends Unit
     public function testDealerCabinetFromFrontendEnv(): void
     {
         verify(PublicSiteUrl::dealerCabinetUrl('https://mf-anna.ru', ''))
-            ->equals('https://mf-anna.ru');
+            ->equals('https://mf-anna.ru/?login=true');
     }
 
     public function testDealerCabinetOverride(): void
