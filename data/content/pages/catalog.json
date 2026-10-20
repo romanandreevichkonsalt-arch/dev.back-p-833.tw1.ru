@@ -1,0 +1,19 @@
+{
+  "catalogSeo": {
+    "direction": {
+      "title": "{direction} — каталог моделей | {brand}",
+      "description": "Каталог {direction_gen}: мебель на заказ, выбор ткани и размеров. {count} позиций. {brand}.",
+      "h1": "{direction}"
+    },
+    "category": {
+      "title": "{category} {direction} — купить от производителя | {brand}",
+      "description": "{category} {direction_gen}: модели на заказ, выбор ткани и размеров. {count} позиций в каталоге. {brand}.",
+      "h1": "{category} {direction}"
+    },
+    "subcategory": {
+      "title": "{subcategory} {category} {direction} | {brand}",
+      "description": "{subcategory} {category_gen} {direction_gen}. {count} моделей в каталоге {brand}.",
+      "h1": "{subcategory} {category} {direction}"
+    }
+  }
+}

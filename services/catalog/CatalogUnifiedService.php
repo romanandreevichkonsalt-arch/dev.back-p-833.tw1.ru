@@ -11,6 +11,8 @@ class CatalogUnifiedService
     private CatalogProductListingService $listing;
     private CatalogTaxonomyService $taxonomy;
     private CatalogRequestParams $requestParams;
+    private CatalogListingBannerService $listingBanners;
+    private CatalogListingSeoService $listingSeo;
 
     public function __construct(
         ?CatalogService $catalog = null,
@@ -18,12 +20,16 @@ class CatalogUnifiedService
         ?CatalogProductListingService $listing = null,
         ?CatalogTaxonomyService $taxonomy = null,
         ?CatalogRequestParams $requestParams = null,
+        ?CatalogListingBannerService $listingBanners = null,
+        ?CatalogListingSeoService $listingSeo = null,
     ) {
         $this->catalog = $catalog ?? \Yii::$container->get(CatalogService::class);
         $this->navigation = $navigation ?? \Yii::$container->get(CatalogNavigationService::class);
         $this->listing = $listing ?? \Yii::$container->get(CatalogProductListingService::class);
         $this->taxonomy = $taxonomy ?? \Yii::$container->get(CatalogTaxonomyService::class);
         $this->requestParams = $requestParams ?? \Yii::$container->get(CatalogRequestParams::class);
+        $this->listingBanners = $listingBanners ?? \Yii::$container->get(CatalogListingBannerService::class);
+        $this->listingSeo = $listingSeo ?? \Yii::$container->get(CatalogListingSeoService::class);
     }
 
     /**
@@ -62,7 +68,11 @@ class CatalogUnifiedService
             if ($direction !== null) {
                 $response['categories'] = $this->taxonomy->buildCategoriesForDirection($direction);
             }
+            $this->appendListingPageContent($response, $normalized, isset($listing['meta']['total'])
+                ? (int)$listing['meta']['total']
+                : null);
         } else {
+            $this->appendListingPageContent($response, $normalized, null);
             $response['items'] = [];
             $response['filters'] = [
                 'price' => null,
@@ -180,5 +190,32 @@ class CatalogUnifiedService
         $normalized = mb_strtolower(trim((string)$value), 'UTF-8');
 
         return in_array($normalized, ['1', 'true', 'yes', 'да'], true);
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     * @param array<string, mixed> $params
+     */
+    private function appendListingPageContent(array &$response, array $params, ?int $productCount): void
+    {
+        if (!$this->hasScopeParam($params)) {
+            return;
+        }
+
+        try {
+            $scope = CatalogScope::fromParams($params);
+        } catch (\Throwable) {
+            return;
+        }
+
+        $pageContent = $this->listingBanners->resolveForScope($scope);
+        if (isset($pageContent['hero'])) {
+            $response['hero'] = $pageContent['hero'];
+        }
+
+        $seo = $this->listingSeo->resolveForScope($scope, $productCount);
+        if ($seo !== []) {
+            $response['seo'] = $seo;
+        }
     }
 }

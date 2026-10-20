@@ -57,6 +57,7 @@ class ContentPage extends ActiveRecord
             'contacts' => 'Контакты',
             'faq' => 'FAQ',
             'journal' => 'Журнал',
+            'catalog' => 'Каталог',
             'building' => 'Производство',
             'about' => 'О нас',
             'vacancies' => 'Вакансии',

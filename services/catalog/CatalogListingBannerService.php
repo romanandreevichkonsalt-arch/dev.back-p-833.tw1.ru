@@ -1,0 +1,289 @@
+<?php
+
+namespace app\services\catalog;
+
+use app\models\CatalogCategory;
+use app\models\CatalogDirection;
+use app\models\CatalogListingBanner;
+use app\models\CatalogSubcategory;
+use app\services\content\HeroBannerPayload;
+use app\services\media\MediaUrlResolver;
+
+final class CatalogListingBannerService
+{
+    public function __construct(
+        private readonly ?MediaUrlResolver $mediaUrls = null,
+    ) {
+    }
+
+    private function mediaUrls(): MediaUrlResolver
+    {
+        return $this->mediaUrls ?? MediaUrlResolver::forPageContent();
+    }
+
+    /**
+     * @return list<array{
+     *     kind: string,
+     *     directionId: int,
+     *     categoryId: int,
+     *     subcategoryId: int,
+     *     label: string,
+     *     configured: bool
+     * }>
+     */
+    public function buildScopeNavItems(CatalogDirection $direction): array
+    {
+        $items = [];
+        $items[] = [
+            'kind' => 'direction',
+            'directionId' => (int)$direction->id,
+            'categoryId' => 0,
+            'subcategoryId' => 0,
+            'label' => (string)$direction->label,
+            'configured' => $this->isScopeConfigured((int)$direction->id, 0, 0),
+        ];
+
+        $categories = CatalogCategory::find()
+            ->where(['is_active' => true])
+            ->with(['subcategories'])
+            ->orderBy(['sort_order' => SORT_ASC, 'label' => SORT_ASC])
+            ->all();
+        foreach ($categories as $category) {
+            $items[] = [
+                'kind' => 'category',
+                'directionId' => (int)$direction->id,
+                'categoryId' => (int)$category->id,
+                'subcategoryId' => 0,
+                'label' => (string)$category->label,
+                'configured' => $this->isScopeConfigured((int)$direction->id, (int)$category->id, 0),
+            ];
+
+            foreach ($category->subcategories as $subcategory) {
+                if (!$subcategory->is_active) {
+                    continue;
+                }
+
+                $items[] = [
+                    'kind' => 'subcategory',
+                    'directionId' => (int)$direction->id,
+                    'categoryId' => (int)$category->id,
+                    'subcategoryId' => (int)$subcategory->id,
+                    'label' => (string)$subcategory->label,
+                    'configured' => $this->isScopeConfigured(
+                        (int)$direction->id,
+                        (int)$category->id,
+                        (int)$subcategory->id
+                    ),
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildAdminFormData(int $directionId, int $categoryId, int $subcategoryId): array
+    {
+        $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
+        if ($banner === null) {
+            return [
+                'hero_title' => '',
+                'hero_subtitle' => '',
+                'image_desktop_src' => '',
+                'image_desktop_alt' => '',
+                'image_mobile_src' => '',
+                'image_mobile_alt' => '',
+            ];
+        }
+
+        return $this->heroToForm($banner->getHeroArray());
+    }
+
+    /**
+     * @param array<string, mixed> $post
+     */
+    public function saveFromPost(int $directionId, int $categoryId, int $subcategoryId, array $post): bool
+    {
+        $hero = $this->heroFromPost($post);
+
+        $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
+        if ($banner === null) {
+            $banner = new CatalogListingBanner([
+                'direction_id' => $directionId,
+                'category_id' => $categoryId,
+                'subcategory_id' => $subcategoryId,
+            ]);
+        }
+
+        $banner->setHeroPayload($hero);
+
+        return $banner->save(false);
+    }
+
+    /**
+     * @return array{hero?: array<string, mixed>}
+     */
+    public function resolveForScope(CatalogScope $scope): array
+    {
+        [$directionId, $categoryId, $subcategoryId] = $this->scopeIds($scope);
+        if ($directionId === null) {
+            return [];
+        }
+
+        $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
+        if ($banner === null) {
+            return [];
+        }
+
+        $hero = $this->normalizeHeroApiPayload($banner->getHeroArray());
+        if ($hero === []) {
+            return [];
+        }
+
+        return $this->mediaUrls()->resolveTree(['hero' => $hero]);
+    }
+
+    public function scopeLabel(int $directionId, int $categoryId, int $subcategoryId): string
+    {
+        if ($subcategoryId > 0) {
+            $subcategory = CatalogSubcategory::findOne($subcategoryId);
+
+            return $subcategory !== null ? (string)$subcategory->label : 'Подкатегория';
+        }
+
+        if ($categoryId > 0) {
+            $category = CatalogCategory::findOne($categoryId);
+
+            return $category !== null ? (string)$category->label : 'Категория';
+        }
+
+        $direction = CatalogDirection::findOne($directionId);
+
+        return $direction !== null ? (string)$direction->label : 'Направление';
+    }
+
+    public function scopeLead(int $directionId, int $categoryId, int $subcategoryId): string
+    {
+        if ($subcategoryId > 0) {
+            return 'Баннер подкатегории в выбранном направлении. SEO — из общего шаблона с переменными.';
+        }
+
+        if ($categoryId > 0) {
+            return 'Баннер категории в выбранном направлении. SEO — из общего шаблона с переменными.';
+        }
+
+        return 'Баннер корня направления в каталоге. SEO — из общего шаблона с переменными.';
+    }
+
+    private function isScopeConfigured(int $directionId, int $categoryId, int $subcategoryId): bool
+    {
+        $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
+        if ($banner === null) {
+            return false;
+        }
+
+        return $this->normalizeHeroApiPayload($banner->getHeroArray()) !== [];
+    }
+
+    private function findBannerRow(int $directionId, int $categoryId, int $subcategoryId): ?CatalogListingBanner
+    {
+        return CatalogListingBanner::find()
+            ->where([
+                'direction_id' => $directionId,
+                'category_id' => $categoryId,
+                'subcategory_id' => $subcategoryId,
+            ])
+            ->one();
+    }
+
+    /**
+     * @return array{0: ?int, 1: int, 2: int}
+     */
+    private function scopeIds(CatalogScope $scope): array
+    {
+        if ($scope->direction === null && $scope->collection?->direction !== null) {
+            $scope->direction = $scope->collection->direction;
+        }
+
+        if ($scope->direction === null) {
+            return [null, 0, 0];
+        }
+
+        $directionId = (int)$scope->direction->id;
+        $categoryId = $scope->category !== null ? (int)$scope->category->id : 0;
+        $subcategoryId = $scope->subcategory !== null ? (int)$scope->subcategory->id : 0;
+
+        return [$directionId, $categoryId, $subcategoryId];
+    }
+
+    /**
+     * @param array<string, mixed> $hero
+     * @return array<string, mixed>
+     */
+    private function normalizeHeroApiPayload(array $hero): array
+    {
+        $heroNormalized = HeroBannerPayload::normalize(array_merge($hero, [
+            'title' => $hero['title'] ?? '',
+            'subtitle' => $hero['subtitle'] ?? '',
+        ]));
+
+        if (isset($heroNormalized['collectionTitle']) && !isset($heroNormalized['title'])) {
+            $heroNormalized['title'] = $heroNormalized['collectionTitle'];
+        }
+        if (isset($heroNormalized['tagline']) && !isset($heroNormalized['subtitle'])) {
+            $heroNormalized['subtitle'] = $heroNormalized['tagline'];
+        }
+
+        unset($heroNormalized['collectionLabel'], $heroNormalized['label'], $heroNormalized['brandTitle']);
+        if (($heroNormalized['collectionTitle'] ?? '') === ($heroNormalized['title'] ?? '')) {
+            unset($heroNormalized['collectionTitle']);
+        }
+        if (($heroNormalized['tagline'] ?? '') === ($heroNormalized['subtitle'] ?? '')) {
+            unset($heroNormalized['tagline']);
+        }
+
+        return array_filter($heroNormalized, static function (mixed $value): bool {
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            return $value !== null && $value !== [];
+        });
+    }
+
+    /**
+     * @param array<string, mixed> $post
+     * @return array<string, mixed>
+     */
+    private function heroFromPost(array $post): array
+    {
+        $images = HeroBannerPayload::fromPost($post);
+
+        return array_filter([
+            'title' => trim((string)($post['hero_title'] ?? '')),
+            'subtitle' => trim((string)($post['hero_subtitle'] ?? '')),
+            'imageDesktop' => $images['imageDesktop'] ?? null,
+            'imageMobile' => $images['imageMobile'] ?? null,
+        ], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+    }
+
+    /**
+     * @param array<string, mixed> $hero
+     * @return array<string, mixed>
+     */
+    private function heroToForm(array $hero): array
+    {
+        $images = HeroBannerPayload::toForm($hero);
+
+        return [
+            'hero_title' => trim((string)($hero['title'] ?? $hero['collectionTitle'] ?? '')),
+            'hero_subtitle' => trim((string)($hero['subtitle'] ?? $hero['tagline'] ?? '')),
+            'image_desktop_src' => $images['image_desktop_src'] ?? '',
+            'image_desktop_alt' => $images['image_desktop_alt'] ?? '',
+            'image_mobile_src' => $images['image_mobile_src'] ?? '',
+            'image_mobile_alt' => $images['image_mobile_alt'] ?? '',
+        ];
+    }
+}

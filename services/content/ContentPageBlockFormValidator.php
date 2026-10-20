@@ -25,6 +25,7 @@ class ContentPageBlockFormValidator
             'about' => ContentPageBlockValidators::about($tab, $post),
             'vacancies' => ContentPageBlockValidators::vacancies($tab, $post),
             'library' => [],
+            'catalog' => [],
             'privacy-policy' => [],
             'user-agreement' => [],
             default => [],

@@ -50,6 +50,7 @@ class BlockTypeRegistry
     public const TYPE_LIBRARY_IMPLEMENTED_MODELS = 'library_implemented_models';
     public const TYPE_LIBRARY_YOUR_IDEA = 'library_your_idea';
     public const TYPE_LIBRARY_DOCUMENTS = 'library_documents';
+    public const TYPE_CATALOG_SEO_TEMPLATES = 'catalog_seo_templates';
     public const TYPE_JSON = 'json';
     public const TYPE_ARTICLE_BLOCKS = 'article_blocks';
 
@@ -102,6 +103,7 @@ class BlockTypeRegistry
             self::TYPE_LIBRARY_IMPLEMENTED_MODELS => 'Библиотека — реализованные модели',
             self::TYPE_LIBRARY_YOUR_IDEA => 'Библиотека — ваша идея',
             self::TYPE_LIBRARY_DOCUMENTS => 'Библиотека — документы',
+            self::TYPE_CATALOG_SEO_TEMPLATES => 'Каталог — SEO-шаблоны',
             self::TYPE_JSON => 'Неизвестный блок',
             self::TYPE_ARTICLE_BLOCKS => 'Блоки текста',
         ];
@@ -298,6 +300,10 @@ class BlockTypeRegistry
             return self::TYPE_LIBRARY_DOCUMENTS;
         }
 
+        if ($pageSlug === 'catalog' && $key === 'catalogSeo' && is_array($value)) {
+            return self::TYPE_CATALOG_SEO_TEMPLATES;
+        }
+
         if (($pageSlug === 'privacy-policy' || $pageSlug === 'user-agreement') && $key === 'blocks' && is_array($value)) {
             return self::TYPE_ARTICLE_BLOCKS;
         }
@@ -359,6 +365,7 @@ class BlockTypeRegistry
             self::TYPE_LIBRARY_IMPLEMENTED_MODELS => '_block_library_implemented_models',
             self::TYPE_LIBRARY_YOUR_IDEA => '_block_library_your_idea',
             self::TYPE_LIBRARY_DOCUMENTS => '_block_library_documents',
+            self::TYPE_CATALOG_SEO_TEMPLATES => '_block_catalog_seo_templates',
             default => '_block_unknown',
         };
     }

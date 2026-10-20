@@ -2,9 +2,11 @@
 
 namespace app\modules\admin\controllers;
 
+use app\models\CatalogDirection;
 use app\models\ContentBlock;
 use app\models\ContentPage;
 use app\modules\admin\helpers\ContentPageAboutHelper;
+use app\modules\admin\helpers\ContentPageCatalogHelper;
 use app\modules\admin\helpers\ContentPageBuildingHelper;
 use app\modules\admin\helpers\ContentPageContactsHelper;
 use app\modules\admin\helpers\ContentPageDesignersHelper;
@@ -22,6 +24,8 @@ use app\services\cache\ApiCacheInvalidator;
 use app\modules\admin\helpers\HomePageProductsHelper;
 use app\services\content\BlockFormHandler;
 use app\services\content\BlockTypeRegistry;
+use app\services\catalog\CatalogListingBannerService;
+use app\services\catalog\CatalogListingSeoService;
 use app\services\content\ContentPageBlockFormValidator;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
@@ -91,6 +95,10 @@ class ContentPageController extends BaseController
 
         if (ContentPageLibraryHelper::usesUnifiedEditor($page->slug)) {
             return $this->tabUnifiedBlocksEditor($page, ContentPageLibraryHelper::class, 'blocks-library');
+        }
+
+        if (ContentPageCatalogHelper::usesUnifiedEditor($page->slug)) {
+            return $this->catalogBlocksEditor($page);
         }
 
         if (ContentPagePrivacyPolicyHelper::usesUnifiedEditor($page->slug)) {
@@ -172,6 +180,10 @@ class ContentPageController extends BaseController
 
         if (ContentPageLibraryHelper::shouldRedirectToPageEditor($block)) {
             return $this->redirect(['blocks', 'id' => $block->page_id, 'tab' => ContentPageLibraryHelper::tabForBlock($block)]);
+        }
+
+        if (ContentPageCatalogHelper::shouldRedirectToPageEditor($block)) {
+            return $this->redirect(['blocks', 'id' => $block->page_id]);
         }
 
         if (ContentPagePrivacyPolicyHelper::shouldRedirectToPageEditor($block)) {
@@ -289,6 +301,126 @@ class ContentPageController extends BaseController
             'page' => $page,
             'activeTab' => $tab,
             'formData' => $postResult['formData'],
+        ]);
+    }
+
+    private function catalogBlocksEditor(ContentPage $page): Response|string
+    {
+        $isSeoTab = trim((string)\Yii::$app->request->get('tab', '')) === 'seo';
+
+        $directions = CatalogDirection::find()
+            ->where(['is_active' => true])
+            ->orderBy(['sort_order' => SORT_ASC, 'id' => SORT_ASC])
+            ->all();
+
+        if ($directions === [] && !$isSeoTab) {
+            \Yii::$app->session->setFlash('warning', 'Нет активных направлений каталога.');
+
+            return $this->redirect(['index']);
+        }
+
+        $seoService = \Yii::$container->get(CatalogListingSeoService::class);
+        if ($isSeoTab) {
+            $formData = $seoService->templatesToForm($seoService->getTemplatesForAdmin((int)$page->id));
+
+            if (\Yii::$app->request->isPost && (string)(\Yii::$app->request->post('catalog_editor') ?? '') === 'seo') {
+                $post = \Yii::$app->request->post();
+                if ($seoService->saveTemplatesFromPost((int)$page->id, $post)) {
+                    ApiCacheInvalidator::touch();
+                    \Yii::$app->session->setFlash('success', 'SEO-шаблоны сохранены.');
+
+                    return $this->redirect(['blocks', 'id' => $page->id, 'tab' => 'seo']);
+                }
+
+                \Yii::$app->session->setFlash('error', 'Не удалось сохранить SEO-шаблоны.');
+                $formData = array_merge($formData, $seoService->templatesToForm($seoService->templatesFromPost($post)));
+            }
+
+            return $this->render('blocks-catalog', [
+                'page' => $page,
+                'directions' => $directions,
+                'activeDirection' => null,
+                'activeCategoryId' => 0,
+                'activeSubcategoryId' => 0,
+                'scopeNavItems' => [],
+                'scopeLabel' => '',
+                'scopeLead' => '',
+                'formData' => $formData,
+                'isSeoTab' => true,
+                'activeTopTabKey' => '_seo',
+                'seoVariableHints' => $seoService->variableHints(),
+            ]);
+        }
+
+        $directionSlug = trim((string)\Yii::$app->request->get('direction', ''));
+        $activeDirection = $directions[0] ?? null;
+        foreach ($directions as $direction) {
+            if ($direction->slug === $directionSlug) {
+                $activeDirection = $direction;
+                break;
+            }
+        }
+
+        if ($activeDirection === null) {
+            return $this->redirect(['blocks', 'id' => $page->id, 'tab' => 'seo']);
+        }
+
+        $categoryId = max(0, (int)\Yii::$app->request->get('categoryId', 0));
+        $subcategoryId = max(0, (int)\Yii::$app->request->get('subcategoryId', 0));
+        if ($subcategoryId > 0 && $categoryId <= 0) {
+            $subcategoryId = 0;
+        }
+
+        $bannerService = \Yii::$container->get(CatalogListingBannerService::class);
+        $formData = $bannerService->buildAdminFormData(
+            (int)$activeDirection->id,
+            $categoryId,
+            $subcategoryId
+        );
+
+        if (\Yii::$app->request->isPost && (string)(\Yii::$app->request->post('catalog_editor') ?? '') === 'banner') {
+            $post = \Yii::$app->request->post();
+            $postDirectionId = (int)($post['direction_id'] ?? 0);
+            $postCategoryId = max(0, (int)($post['category_id'] ?? 0));
+            $postSubcategoryId = max(0, (int)($post['subcategory_id'] ?? 0));
+            if ($postSubcategoryId > 0 && $postCategoryId <= 0) {
+                $postSubcategoryId = 0;
+            }
+
+            if ($postDirectionId === (int)$activeDirection->id
+                && $postCategoryId === $categoryId
+                && $postSubcategoryId === $subcategoryId
+                && $bannerService->saveFromPost($postDirectionId, $postCategoryId, $postSubcategoryId, $post)
+            ) {
+                ApiCacheInvalidator::touch();
+                \Yii::$app->session->setFlash('success', 'Баннер сохранён.');
+
+                return $this->redirect([
+                    'blocks',
+                    'id' => $page->id,
+                    'direction' => $activeDirection->slug,
+                    'categoryId' => $categoryId,
+                    'subcategoryId' => $subcategoryId,
+                ]);
+            }
+
+            \Yii::$app->session->setFlash('error', 'Не удалось сохранить баннер.');
+            $formData = array_merge($formData, ContentPageBlockFormValidator::formDataFromPost('catalog', '', $post));
+        }
+
+        return $this->render('blocks-catalog', [
+            'page' => $page,
+            'directions' => $directions,
+            'activeDirection' => $activeDirection,
+            'activeCategoryId' => $categoryId,
+            'activeSubcategoryId' => $subcategoryId,
+            'scopeNavItems' => $bannerService->buildScopeNavItems($activeDirection),
+            'scopeLabel' => $bannerService->scopeLabel((int)$activeDirection->id, $categoryId, $subcategoryId),
+            'scopeLead' => $bannerService->scopeLead((int)$activeDirection->id, $categoryId, $subcategoryId),
+            'formData' => $formData,
+            'isSeoTab' => false,
+            'activeTopTabKey' => $activeDirection->slug,
+            'seoVariableHints' => $seoService->variableHints(),
         ]);
     }
 
