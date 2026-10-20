@@ -1182,6 +1182,48 @@ body.admin-modal-open {
     color: #9a6700;
 }
 
+.admin-error-page {
+    max-width: 720px;
+}
+
+.admin-error-page__badge {
+    display: inline-block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--admin-danger);
+    background: #f8eaea;
+    border-radius: 999px;
+    padding: 4px 12px;
+    margin-bottom: 12px;
+}
+
+.admin-error-page__title {
+    margin: 0 0 16px;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.admin-error-page__message {
+    margin-bottom: 12px;
+}
+
+.admin-error-page__hint {
+    margin: 0 0 20px;
+    line-height: 1.5;
+}
+
+.admin-error-page__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-error-page__copied {
+    font-size: 0.875rem;
+}
+
 .admin-flash-list {
     margin: 8px 0 0;
     padding-left: 1.2rem;

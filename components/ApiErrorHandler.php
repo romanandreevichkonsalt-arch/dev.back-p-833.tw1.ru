@@ -20,6 +20,18 @@ class ApiErrorHandler extends ErrorHandler
             return;
         }
 
+        if ($this->isAdminRequest()) {
+            $previousAction = $this->errorAction;
+            $this->errorAction = 'admin/site/error';
+            try {
+                parent::renderException($exception);
+            } finally {
+                $this->errorAction = $previousAction;
+            }
+
+            return;
+        }
+
         parent::renderException($exception);
     }
 
@@ -28,6 +40,13 @@ class ApiErrorHandler extends ErrorHandler
         $path = Yii::$app->request->getPathInfo();
 
         return strpos($path, 'api/v1') === 0;
+    }
+
+    private function isAdminRequest(): bool
+    {
+        $path = Yii::$app->request->getPathInfo();
+
+        return $path === 'admin' || str_starts_with($path, 'admin/');
     }
 
     private function renderApiException(Throwable $exception): void

@@ -20,9 +20,9 @@ class SiteController extends Controller
                 'user' => 'adminUser',
                 'rules' => [
                     [
-                        'actions' => ['login'],
+                        'actions' => ['login', 'error'],
                         'allow' => true,
-                        'roles' => ['?'],
+                        'roles' => ['?', '@'],
                     ],
                     [
                         'actions' => ['logout'],
@@ -32,6 +32,26 @@ class SiteController extends Controller
                 ],
             ],
         ];
+    }
+
+    public function actions(): array
+    {
+        return [
+            'error' => [
+                'class' => \app\modules\admin\actions\AdminErrorAction::class,
+                'layout' => 'main',
+                'view' => 'error',
+            ],
+        ];
+    }
+
+    public function beforeAction($action): bool
+    {
+        if ($action->id === 'error') {
+            $this->layout = 'main';
+        }
+
+        return parent::beforeAction($action);
     }
 
     public function actionLogin()
