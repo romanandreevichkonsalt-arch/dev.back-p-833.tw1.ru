@@ -6,8 +6,6 @@ final class PublicSiteUrl
 {
     public const DEFAULT_FRONTEND = 'https://dev-fabrika.ru';
 
-    public const DEALER_CABINET_PATH = '/dealer';
-
     public static function frontendUrl(?string $envValue = null): string
     {
         if ($envValue === null) {
@@ -30,6 +28,6 @@ final class PublicSiteUrl
             return $override;
         }
 
-        return self::frontendUrl($envFrontend) . self::DEALER_CABINET_PATH;
+        return self::frontendUrl($envFrontend);
     }
 }
