@@ -208,14 +208,12 @@ class CatalogUnifiedService
             return;
         }
 
-        $pageContent = $this->listingBanners->resolveForScope($scope);
+        $pageContent = $this->listingBanners->resolveForScope($scope, $productCount);
         if (isset($pageContent['hero'])) {
             $response['hero'] = $pageContent['hero'];
         }
-
-        $seo = $this->listingSeo->resolveForScope($scope, $productCount);
-        if ($seo !== []) {
-            $response['seo'] = $seo;
+        if (isset($pageContent['seo'])) {
+            $response['seo'] = $pageContent['seo'];
         }
     }
 }

@@ -35,17 +35,26 @@ class CatalogListingBanner extends ActiveRecord
     /**
      * @return array<string, mixed>
      */
+    public function getSeoArray(): array
+    {
+        return $this->decodeJsonField($this->seo_data);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function getHeroArray(): array
     {
         return $this->decodeJsonField($this->hero_data);
     }
 
     /**
+     * @param array<string, mixed> $seo
      * @param array<string, mixed> $hero
      */
-    public function setHeroPayload(array $hero): void
+    public function setScopePayload(array $seo, array $hero): void
     {
-        $this->seo_data = '{}';
+        $this->seo_data = json_encode($seo, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $this->hero_data = json_encode($hero, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 

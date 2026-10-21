@@ -59,6 +59,14 @@ final class CatalogListingSeoService
      */
     public function resolveForScope(CatalogScope $scope, ?int $productCount = null): array
     {
+        return $this->resolveFallbackForScope($scope, $productCount);
+    }
+
+    /**
+     * @return array{title?: string, description?: string, h1?: string}
+     */
+    public function resolveFallbackForScope(CatalogScope $scope, ?int $productCount = null): array
+    {
         $page = ContentPage::find()->where(['slug' => 'catalog', 'is_active' => true])->one();
         if ($page === null) {
             return [];
@@ -70,18 +78,42 @@ final class CatalogListingSeoService
             return [];
         }
 
-        $template = $templates[$level];
+        return $this->renderStoredSeo($templates[$level], $scope, $productCount);
+    }
+
+    /**
+     * @param array<string, mixed> $rawSeo
+     * @return array{title?: string, description?: string, h1?: string}
+     */
+    public function renderStoredSeo(array $rawSeo, CatalogScope $scope, ?int $productCount = null): array
+    {
         $variables = $this->buildVariables($scope, $productCount);
 
         $result = [];
         foreach (['title', 'description', 'h1'] as $field) {
-            $rendered = $this->renderTemplate((string)($template[$field] ?? ''), $variables);
+            $rendered = $this->renderTemplate((string)($rawSeo[$field] ?? ''), $variables);
             if ($rendered !== '') {
                 $result[$field] = $rendered;
             }
         }
 
         return $result;
+    }
+
+    /**
+     * @return array{title: string, description: string, h1: string}
+     */
+    public function defaultTemplateForAdminScope(int $categoryId, int $subcategoryId): array
+    {
+        if ($subcategoryId > 0) {
+            $level = 'subcategory';
+        } elseif ($categoryId > 0) {
+            $level = 'category';
+        } else {
+            $level = 'direction';
+        }
+
+        return self::defaultTemplates()[$level];
     }
 
     /**

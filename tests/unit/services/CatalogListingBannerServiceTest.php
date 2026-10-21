@@ -22,6 +22,9 @@ class CatalogListingBannerServiceTest extends Unit
 
         $service = new CatalogListingBannerService();
         $saved = $service->saveFromPost((int)$direction->id, (int)$category->id, 0, [
+            'seo_title' => 'SEO {category} — {direction}',
+            'seo_description' => 'Count {count}',
+            'seo_h1' => 'H1 {category}',
             'hero_title' => 'Hero title',
             'hero_subtitle' => 'Hero subtitle',
             'image_desktop_src' => '',
@@ -35,10 +38,12 @@ class CatalogListingBannerServiceTest extends Unit
         $scope->direction = $direction;
         $scope->category = $category;
 
-        $payload = $service->resolveForScope($scope);
+        $payload = $service->resolveForScope($scope, 5);
         verify($payload)->arrayHasKey('hero');
         verify($payload['hero']['title'] ?? '')->equals('Hero title');
-        verify($payload)->arrayNotHasKey('seo');
+        verify($payload)->arrayHasKey('seo');
+        verify($payload['seo']['title'] ?? '')->stringContainsString((string)$category->label);
+        verify($payload['seo']['description'] ?? '')->stringContainsString('5');
 
         CatalogListingBanner::deleteAll([
             'direction_id' => (int)$direction->id,

@@ -6,6 +6,8 @@ use app\models\CatalogCategory;
 use app\models\CatalogDirection;
 use app\models\CatalogListingBanner;
 use app\models\CatalogSubcategory;
+use app\services\content\BlockFormHandler;
+use app\services\content\BlockTypeRegistry;
 use app\services\content\HeroBannerPayload;
 use app\services\media\MediaUrlResolver;
 
@@ -13,12 +15,18 @@ final class CatalogListingBannerService
 {
     public function __construct(
         private readonly ?MediaUrlResolver $mediaUrls = null,
+        private readonly ?CatalogListingSeoService $listingSeo = null,
     ) {
     }
 
     private function mediaUrls(): MediaUrlResolver
     {
         return $this->mediaUrls ?? MediaUrlResolver::forPageContent();
+    }
+
+    private function listingSeo(): CatalogListingSeoService
+    {
+        return $this->listingSeo ?? new CatalogListingSeoService();
     }
 
     /**
@@ -88,17 +96,25 @@ final class CatalogListingBannerService
     {
         $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
         if ($banner === null) {
-            return [
-                'hero_title' => '',
-                'hero_subtitle' => '',
-                'image_desktop_src' => '',
-                'image_desktop_alt' => '',
-                'image_mobile_src' => '',
-                'image_mobile_alt' => '',
-            ];
+            $defaults = $this->listingSeo()->defaultTemplateForAdminScope($categoryId, $subcategoryId);
+
+            return array_merge(
+                $this->seoToForm($defaults),
+                [
+                    'hero_title' => '',
+                    'hero_subtitle' => '',
+                    'image_desktop_src' => '',
+                    'image_desktop_alt' => '',
+                    'image_mobile_src' => '',
+                    'image_mobile_alt' => '',
+                ]
+            );
         }
 
-        return $this->heroToForm($banner->getHeroArray());
+        return array_merge(
+            $this->seoToForm($banner->getSeoArray()),
+            $this->heroToForm($banner->getHeroArray())
+        );
     }
 
     /**
@@ -106,6 +122,9 @@ final class CatalogListingBannerService
      */
     public function saveFromPost(int $directionId, int $categoryId, int $subcategoryId, array $post): bool
     {
+        $handler = new BlockFormHandler();
+        $seo = $handler->dataFromPost(BlockTypeRegistry::TYPE_SEO, $post);
+        $seo['h1'] = trim((string)($post['seo_h1'] ?? ''));
         $hero = $this->heroFromPost($post);
 
         $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
@@ -117,32 +136,45 @@ final class CatalogListingBannerService
             ]);
         }
 
-        $banner->setHeroPayload($hero);
+        $banner->setScopePayload($seo, $hero);
 
         return $banner->save(false);
     }
 
     /**
-     * @return array{hero?: array<string, mixed>}
+     * @return array{hero?: array<string, mixed>, seo?: array<string, mixed>}
      */
-    public function resolveForScope(CatalogScope $scope): array
+    public function resolveForScope(CatalogScope $scope, ?int $productCount = null): array
     {
         [$directionId, $categoryId, $subcategoryId] = $this->scopeIds($scope);
         if ($directionId === null) {
             return [];
         }
 
+        $result = [];
         $banner = $this->findBannerRow($directionId, $categoryId, $subcategoryId);
-        if ($banner === null) {
+
+        $seoRaw = $banner !== null ? $banner->getSeoArray() : [];
+        $seo = $this->listingSeo()->renderStoredSeo($seoRaw, $scope, $productCount);
+        if ($seo === []) {
+            $seo = $this->listingSeo()->resolveFallbackForScope($scope, $productCount);
+        }
+        if ($seo !== []) {
+            $result['seo'] = $seo;
+        }
+
+        if ($banner !== null) {
+            $hero = $this->normalizeHeroApiPayload($banner->getHeroArray());
+            if ($hero !== []) {
+                $result['hero'] = $hero;
+            }
+        }
+
+        if ($result === []) {
             return [];
         }
 
-        $hero = $this->normalizeHeroApiPayload($banner->getHeroArray());
-        if ($hero === []) {
-            return [];
-        }
-
-        return $this->mediaUrls()->resolveTree(['hero' => $hero]);
+        return $this->mediaUrls()->resolveTree($result);
     }
 
     public function scopeLabel(int $directionId, int $categoryId, int $subcategoryId): string
@@ -167,14 +199,14 @@ final class CatalogListingBannerService
     public function scopeLead(int $directionId, int $categoryId, int $subcategoryId): string
     {
         if ($subcategoryId > 0) {
-            return 'Баннер подкатегории в выбранном направлении. SEO — из общего шаблона с переменными.';
+            return 'SEO и баннер подкатегории в выбранном направлении.';
         }
 
         if ($categoryId > 0) {
-            return 'Баннер категории в выбранном направлении. SEO — из общего шаблона с переменными.';
+            return 'SEO и баннер категории в выбранном направлении.';
         }
 
-        return 'Баннер корня направления в каталоге. SEO — из общего шаблона с переменными.';
+        return 'SEO и баннер корня направления в каталоге.';
     }
 
     private function isScopeConfigured(int $directionId, int $categoryId, int $subcategoryId): bool
@@ -184,7 +216,15 @@ final class CatalogListingBannerService
             return false;
         }
 
-        return $this->normalizeHeroApiPayload($banner->getHeroArray()) !== [];
+        if ($this->normalizeHeroApiPayload($banner->getHeroArray()) !== []) {
+            return true;
+        }
+
+        $seo = $banner->getSeoArray();
+
+        return trim((string)($seo['title'] ?? '')) !== ''
+            || trim((string)($seo['description'] ?? '')) !== ''
+            || trim((string)($seo['h1'] ?? '')) !== '';
     }
 
     private function findBannerRow(int $directionId, int $categoryId, int $subcategoryId): ?CatalogListingBanner
@@ -267,6 +307,19 @@ final class CatalogListingBannerService
             'imageDesktop' => $images['imageDesktop'] ?? null,
             'imageMobile' => $images['imageMobile'] ?? null,
         ], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+    }
+
+    /**
+     * @param array<string, mixed> $seo
+     * @return array<string, mixed>
+     */
+    private function seoToForm(array $seo): array
+    {
+        return [
+            'seo_title' => trim((string)($seo['title'] ?? '')),
+            'seo_description' => trim((string)($seo['description'] ?? '')),
+            'seo_h1' => trim((string)($seo['h1'] ?? '')),
+        ];
     }
 
     /**

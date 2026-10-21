@@ -26,7 +26,7 @@ use OpenApi\Annotations as OA;
  *
  * @OA\Tag(
  *     name="Каталог",
- *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — только рекомендуемые ткани для страницы библиотеки (сортировка по position_number); в каждом item — swatch (основное фото образца) и additionalPhotos[] (доп. фото только для этого метода, из админки коллекции ткани); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
+ *     description="GET /api/v1/catalog/menu — меню, taxonomy, навигация и листинг. При scope (direction / category / subcategory в query или path) в ответе опционально hero (баннер раздела из админки «Каталог») и seo (title, description, h1 из SEO-шаблонов с подстановкой переменных). GET /api/v1/catalog/products — все SKU или collection=true (секции линеек в items[]). GET /api/v1/catalog/library-products — одна SKU на коллекцию мебели (библиотека 3D). GET /api/v1/catalog/library-fabrics — только рекомендуемые ткани для страницы библиотеки (сортировка по position_number); в каждом item — swatch (основное фото образца) и additionalPhotos[] (доп. фото только для этого метода, из админки коллекции ткани); в meta.texturesArchiveUrl — ссылка на готовый ZIP фото образцов (/files/library-fabrics.zip), если архив собран. GET /api/v1/catalog/menu/{slugs} — scope из path. HEAD — X-Total-Count. Query collection: true/false — группировка по линейкам (Аполлон, Артемида…); slug (a-plus, artemida) — scope. direction = направление. modelLine = линейка. itemsPerGroup — SKU на линейку при collection=true (default 3). GET /api/v1/catalog/products/{slug} — карточка товара."
  * )
  *
  * @OA\Tag(
@@ -1147,6 +1147,25 @@ use OpenApi\Annotations as OA;
  * )
  *
  * @OA\Schema(
+ *     schema="CatalogListingSeo",
+ *     type="object",
+ *     description="SEO листинга каталога: тексты по scope из админки «Страницы → Каталог» (направление / категория / подкатегория), переменные подставлены под текущий scope; при пустых полях — fallback из глобальных шаблонов.",
+ *     @OA\Property(property="title", type="string", example="Диваны A+ — купить от производителя | MF Anna"),
+ *     @OA\Property(property="description", type="string", nullable=true, example="Диваны коллекции A+: модели на заказ. 38 позиций в каталоге. MF Anna."),
+ *     @OA\Property(property="h1", type="string", nullable=true, example="Диваны A+")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="CatalogListingHero",
+ *     type="object",
+ *     description="Баннер листинга: направление × категория × подкатегория из админки «Каталог». Поля пустые — ключ может отсутствовать.",
+ *     @OA\Property(property="title", type="string", nullable=true, example="Диваны A+"),
+ *     @OA\Property(property="subtitle", type="string", nullable=true),
+ *     @OA\Property(property="imageDesktop", ref="#/components/schemas/CatalogImage", nullable=true),
+ *     @OA\Property(property="imageMobile", ref="#/components/schemas/CatalogImage", nullable=true)
+ * )
+ *
+ * @OA\Schema(
  *     schema="PageHeroMedia",
  *     type="object",
  *     description="Баннер страницы (единая схема с главной)",
@@ -2020,7 +2039,7 @@ use OpenApi\Annotations as OA;
  * @OA\Schema(
  *     schema="CatalogUnifiedResponse",
  *     type="object",
- *     description="Единый ответ GET /api/v1/catalog/menu и GET /api/v1/catalog/products: меню + навигация; items/filters/meta — при scope, collection=true или на /products. meta.layout=flat — items[] = SKU; meta.layout=collectionGroups — items[] = CatalogModelLineGroup[] (collection=true).",
+ *     description="Единый ответ GET /api/v1/catalog/menu и GET /api/v1/catalog/products: меню + навигация; items/filters/meta — при scope, collection=true или на /products. meta.layout=flat — items[] = SKU; meta.layout=collectionGroups — items[] = CatalogModelLineGroup[] (collection=true). При scope: seo и hero — если настроены в админке для этого уровня (направление / категория / подкатегория).",
  *     required={"directions","groups","collections","breadcrumb","level","navigationItems","items","filters"},
  *     allOf={
  *         @OA\Schema(ref="#/components/schemas/CatalogMenuResponse"),
@@ -2030,6 +2049,8 @@ use OpenApi\Annotations as OA;
  *             @OA\Property(property="level", type="string", enum={"direction","collection","category","subcategory"}),
  *             @OA\Property(property="navigationItems", type="array", @OA\Items(ref="#/components/schemas/CatalogNavigationNode")),
  *             @OA\Property(property="navigationMeta", type="object", nullable=true),
+ *             @OA\Property(property="seo", ref="#/components/schemas/CatalogListingSeo", nullable=true, description="Только при scope в запросе"),
+ *             @OA\Property(property="hero", ref="#/components/schemas/CatalogListingHero", nullable=true, description="Только при scope в запросе"),
  *             @OA\Property(
  *                 property="items",
  *                 type="array",
