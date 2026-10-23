@@ -15,7 +15,7 @@ use OpenApi\Annotations as OA;
  *
  * @OA\Info(
  *     title="Fabrika API",
- *     version="1.10.49",
+ *     version="1.10.50",
  *     description="Документация API: страницы (вакансии — направления из БД, values.slides), каталог (retailPrice — розница, dealerPrice — скидка/акция дилера; POST /catalog/models/{slug}/3d-file — загрузка 3D-файла модели, не в карточке товара), корзина и заказы (guest → ЮKassa paymentConfirmationUrl; дилер → заявка менеджеру; retailSubtotal, dealerDiscountAmount, discounts: dealer→promo→cashback; totalAmount включает cashlessSurchargeAmount), избранное (X-Session-ID), мудборд (Bearer или X-Session-ID; GET /moodboard/public/{shareCode}), ЛКД дилера, журнал, поиск, DaData, webhook ЮKassa"
  * )
  *
@@ -746,6 +746,7 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="quantity", type="integer", example=2, title="остаток", description="остаток на складе"),
  *     @OA\Property(property="inStock", type="boolean", example=true, title="в наличии", description="true, если товар активен и quantity > 0"),
  *     @OA\Property(property="custom", type="boolean", example=false, title="кастом", description="true — SKU «кастом» модели без выбранного цвета ткани"),
+ *     @OA\Property(property="catalogModelId", type="integer", nullable=true, example=42, title="ID модели", description="Числовой PK catalog_models; null у SKU без model_id"),
  *     @OA\Property(property="fittingRoomUrl", type="string", nullable=true, example="SKU · ссылка на 3D-примерочную", title="3D-примерочная", description="ссылка на 3D-примерочную с модели; только у SKU, сгенерированных из модели"),
  *     @OA\Property(property="modelId", type="string", nullable=true, example="модель · slug", title="slug модели", description="slug модели; только у SKU, сгенерированных из модели"),
  *     @OA\Property(
@@ -1986,6 +1987,8 @@ use OpenApi\Annotations as OA;
  *     @OA\Property(property="slug", type="string"),
  *     @OA\Property(property="id", type="string"),
  *     @OA\Property(property="name", type="string"),
+ *     @OA\Property(property="catalogModelId", type="integer", nullable=true, description="Числовой PK catalog_models"),
+ *     @OA\Property(property="modelId", type="string", nullable=true, description="slug модели каталога"),
  *     @OA\Property(property="fabric", type="string", nullable=true, example="GUCCI 422", description="коллекция ткани и design-code через пробел"),
  *     @OA\Property(property="isPopular", type="boolean", description="Флаг is_popular у SKU (не путать с sort=popular и не выводить бейдж без badge/badges)"),
  *     @OA\Property(property="listingPriorityOrder", type="integer", nullable=true, minimum=1, description="№ в списке приоритетов каталога (/admin/search?tab=catalog) на page 1 при scope direction; только у настроенных образцов SKU"),

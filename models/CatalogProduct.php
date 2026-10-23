@@ -163,6 +163,15 @@ class CatalogProduct extends ActiveRecord
         return $this->model_id !== null && (int)$this->model_id > 0;
     }
 
+    public function resolveCatalogModelId(): ?int
+    {
+        if ($this->model_id === null || (int)$this->model_id <= 0) {
+            return null;
+        }
+
+        return (int)$this->model_id;
+    }
+
     public function getListingGroupKey(): int
     {
         return (int)$this->model_id > 0 ? (int)$this->model_id : -1 * (int)$this->id;
@@ -460,6 +469,7 @@ class CatalogProduct extends ActiveRecord
             'quantity' => (int)$this->quantity,
             'inStock' => (bool)$this->is_active && (int)$this->quantity > 0,
             'custom' => (bool)$this->is_custom,
+            'catalogModelId' => $this->resolveCatalogModelId(),
         ];
 
         if ($this->isGeneratedFromModel() && $this->catalogModel !== null) {
@@ -584,7 +594,7 @@ class CatalogProduct extends ActiveRecord
 
         $pricing = $this->buildPricingApiPayload($dealer);
 
-        return self::applyListingPricingApiFields([
+        $card = self::applyListingPricingApiFields([
             'slug' => $this->slug,
             'id' => $this->slug,
             'name' => $this->title,
@@ -595,7 +605,14 @@ class CatalogProduct extends ActiveRecord
             'swatches' => $swatchPayload['swatches'],
             'swatchCount' => $swatchPayload['swatchCount'],
             'href' => $slugResolver->buildProductUrl((string)$this->slug),
+            'catalogModelId' => $this->resolveCatalogModelId(),
         ], $pricing);
+
+        if ($this->catalogModel !== null) {
+            $card['modelId'] = $this->catalogModel->slug;
+        }
+
+        return $card;
     }
 
     /**
@@ -742,7 +759,7 @@ class CatalogProduct extends ActiveRecord
             'title' => $this->title,
             'quantity' => $quantity,
             'custom' => (bool)$this->is_custom,
-            'catalogModelId' => $this->model_id !== null ? (int)$this->model_id : null,
+            'catalogModelId' => $this->resolveCatalogModelId(),
             'image' => $this->resolvePrimaryImagePayload(),
         ], $pricing);
     }

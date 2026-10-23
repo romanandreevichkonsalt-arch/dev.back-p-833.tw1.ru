@@ -53,6 +53,22 @@ class CatalogProductPricingApiTest extends Unit
         $this->assertSame(100000, $item['retailPrice']);
         $this->assertSame('100 000 ₽', $item['priceDisplay']);
         $this->assertSame('100 000 ₽', $item['price']);
+        $this->assertArrayHasKey('catalogModelId', $item);
+        $this->assertNull($item['catalogModelId']);
+    }
+
+    public function testMenuApiItemExposesCatalogModelId(): void
+    {
+        $product = new CatalogProduct([
+            'slug' => 'test-menu-item',
+            'title' => 'Test',
+            'href' => '/product/test-menu-item',
+            'model_id' => 42,
+        ]);
+
+        $item = $product->toMenuApiItem(null);
+
+        $this->assertSame(42, $item['catalogModelId']);
     }
 
     public function testListingCardExposesDealerPrice(): void
@@ -73,6 +89,8 @@ class CatalogProductPricingApiTest extends Unit
         $this->assertArrayHasKey('dealerPrice', $card);
         $this->assertArrayNotHasKey('priceDisplay', $card);
         $this->assertArrayNotHasKey('badges', $card);
+        $this->assertArrayHasKey('catalogModelId', $card);
+        $this->assertNull($card['catalogModelId']);
     }
 
     public function testSearchIndexDocumentOmitsListingOnlyFields(): void
